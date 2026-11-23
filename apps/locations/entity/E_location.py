@@ -1,9 +1,9 @@
 from typing import Optional
 
-from apps.core.entity import E_audit_base
+from enginedj.base.entity import E_model_base
 
 
-class E_location(E_audit_base):
+class E_location(E_model_base):
 
     def __init__(
         self,

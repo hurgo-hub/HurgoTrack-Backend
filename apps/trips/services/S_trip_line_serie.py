@@ -2,8 +2,8 @@ from django.db import transaction
 
 from enginedj.base.services import BaseService
 
-from apps.core.exceptions import BusinessError, BusinessNotFound
-from apps.core.permissions import require_perm
+from enginedj.base.exceptions import BusinessError, BusinessNotFound
+from enginedj.base.services.permissions import require_perm
 from apps.orders.repository import R_order_line_trip
 from apps.trips.entity import E_trip_line_serie
 from apps.trips.repository import R_trip, R_trip_line, R_trip_line_serie
@@ -49,6 +49,6 @@ class S_trip_line_serie(BaseService[E_trip_line_serie]):
                                     code="vin_in_use")
             created.append(self.repository.create_serie(
                 trip_line_id=stop, order_line_trip_id=allocation, vin=vin,
-                engine_number=str(row.get("engine_number") or "").strip().upper(), create_user_id=user,
+                engine_number=str(row.get("engine_number") or "").strip().upper(), create_user=user,
             ))
         return created

@@ -2,8 +2,8 @@ from django.utils import timezone
 
 from enginedj.base.services import BaseService
 
-from apps.core.choices import license_covers
-from apps.core.exceptions import BusinessError, BusinessNotFound
+from enginedj.base.choices import license_covers
+from enginedj.base.exceptions import BusinessError, BusinessNotFound
 from apps.drivers.entity import E_driver
 from apps.drivers.repository import R_driver
 

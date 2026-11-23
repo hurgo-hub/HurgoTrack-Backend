@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_trip(M_audit_base, models.Model):
+class M_trip(M_model_base, models.Model):
     """Viaje: el corazón del sistema.
 
     ``company_id`` (company_id_do del .mwb): empresa cliente dueña de la carga.
@@ -27,7 +27,7 @@ class M_trip(M_audit_base, models.Model):
     ]
 
     code = models.CharField(max_length=20, null=False, blank=False, unique=True, editable=False)
-    company_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    company_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="trip_company_id", db_column="company_id")
     trip_type = models.CharField(max_length=10, null=False, blank=False, choices=trip_type_choices, default="delivery")
     state = models.CharField(max_length=15, null=False, blank=False, choices=state_choices, default="draft",
@@ -35,7 +35,7 @@ class M_trip(M_audit_base, models.Model):
     brand_id = models.ForeignKey("orders.M_brand", on_delete=models.PROTECT, null=True, blank=True,
                                  related_name="trip_brand_id", db_column="brand_id",
                                  help_text="Marca única del viaje cuando lleva motos.")
-    carrier_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=True, blank=True,
+    carrier_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=True, blank=True,
                                    related_name="trip_carrier_id", db_column="carrier_id",
                                    help_text="Transportador que hace el viaje.")
     vehicle_id = models.ForeignKey("fleet.M_vehicle", on_delete=models.PROTECT, null=True, blank=True,

@@ -3,10 +3,10 @@ from decimal import Decimal
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_order_line(M_audit_base, models.Model):
+class M_order_line(M_model_base, models.Model):
     """``order_dtd_line`` del .mwb: producto, cantidad y destino.
 
     qty_assigned / qty_delivered los recalcula el sistema desde las
@@ -28,7 +28,7 @@ class M_order_line(M_audit_base, models.Model):
                                  related_name="order_line_order_id", db_column="order_id")
     item_id = models.ForeignKey("orders.M_item", on_delete=models.PROTECT, null=False, blank=False,
                                 related_name="order_line_item_id", db_column="item_id")
-    recipient_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    recipient_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                      related_name="order_line_recipient_id", db_column="recipient_id",
                                      help_text="company_id del .mwb: a quién se entrega.")
     address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=False, blank=False,

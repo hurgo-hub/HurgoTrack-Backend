@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_country(M_audit_base, models.Model):
+class M_country(M_model_base, models.Model):
     model_name = "country"
 
     iso_code = models.CharField(max_length=3, null=False, blank=False, unique=True, help_text="code_country del .mwb, ej. CO.")

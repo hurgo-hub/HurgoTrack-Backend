@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_address_attach(M_audit_base, models.Model):
+class M_address_attach(M_model_base, models.Model):
     model_name = "address_attach"
 
     address_id = models.ForeignKey("locations.M_address", on_delete=models.CASCADE, null=False, blank=False,

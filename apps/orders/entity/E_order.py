@@ -1,10 +1,10 @@
 from datetime import date, datetime
 from typing import Optional
 
-from apps.core.entity import E_audit_base
+from enginedj.base.entity import E_model_base
 
 
-class E_order(E_audit_base):
+class E_order(E_model_base):
 
     def __init__(
         self,

@@ -9,8 +9,8 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from apps.apiOdoo.models import M_odoo_purchase, M_odoo_sync_log
-from apps.companies.models import M_company
-from apps.core.testing import build_world, proof_file, run_workflow
+from enginedj.base.models import M_company
+from apps.testing import build_world, proof_file, run_workflow
 
 MEDIA_ROOT = tempfile.mkdtemp()
 ODOO = {"ODOO_ENABLED": True, "ODOO_URL": "https://odoo.test", "ODOO_DB": "hurgo", "ODOO_USERNAME": "api@hurgo.co",

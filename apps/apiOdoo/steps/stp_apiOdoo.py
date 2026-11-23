@@ -10,9 +10,9 @@ from apps.apiOdoo.serializers import (
     Sz_sync_products_in,
 )
 from apps.apiOdoo.services import S_odoo_purchase, S_odoo_sync
-from apps.core.permissions import has_perm
-from apps.core.exceptions import BusinessPermissionError
-from apps.core.steps import context_user, results, validate_input
+from enginedj.base.services.permissions import has_perm
+from enginedj.base.exceptions import BusinessPermissionError
+from enginedj.base.steps.helpers import context_user, results, validate_input
 
 
 @register_module("apiOdoo.get_purchase", important=True)

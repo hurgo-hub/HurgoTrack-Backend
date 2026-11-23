@@ -2,21 +2,21 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
-from apps.core.choices import LICENSE_CATEGORY_CHOICES
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.choices import LICENSE_CATEGORY_CHOICES
+from enginedj.base.models import M_model_base
 
 
-class M_driver(M_audit_base, models.Model):
+class M_driver(M_model_base, models.Model):
     """``drive`` del .mwb. ``user_id`` es el login de la app móvil; nombre y documento van en auth.User + M_user_detail."""
 
     model_name = "driver"
 
-    company_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    company_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="driver_company_id", db_column="company_id",
                                    help_text="Transportador con el que trabaja (Hurgo o independiente).")
     user_id = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="driver_user_id", db_column="user_id")
-    partner_id = models.ForeignKey("companies.M_partner", on_delete=models.SET_NULL, null=True, blank=True,
+    partner_id = models.ForeignKey("fleet.M_partner", on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name="driver_partner_id", db_column="partner_id",
                                    help_text="Solo si el conductor también es propietario / tercero registrado.")
     license_number = models.CharField(max_length=30, null=False, blank=False, unique=True, help_text="n_license del .mwb.")

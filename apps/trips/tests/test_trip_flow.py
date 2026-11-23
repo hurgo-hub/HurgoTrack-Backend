@@ -9,7 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework.test import APIClient, APITestCase
 
-from apps.core.testing import PASSWORD, build_world, proof_file, run_workflow
+from apps.testing import PASSWORD, build_world, proof_file, run_workflow
 from apps.fleet.models import M_soat
 from apps.trips.models import M_trip, M_trip_attach, M_trip_line
 

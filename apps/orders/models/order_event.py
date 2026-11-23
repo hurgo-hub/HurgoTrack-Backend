@@ -2,10 +2,10 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_order_event(M_audit_base, models.Model):
+class M_order_event(M_model_base, models.Model):
     """Historial del pedido: cada paso con fecha y responsable (lo ve el cliente)."""
 
     model_name = "order_event"

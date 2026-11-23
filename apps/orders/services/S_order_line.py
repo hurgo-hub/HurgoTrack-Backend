@@ -1,6 +1,6 @@
 from enginedj.base.services import BaseService
 
-from apps.core.permissions import require_perm
+from enginedj.base.services.permissions import require_perm
 from apps.orders.entity import E_order_line
 from apps.orders.repository import R_order_line
 

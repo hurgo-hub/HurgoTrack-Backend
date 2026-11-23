@@ -1,10 +1,10 @@
 from django.db import models
 
-from apps.core.fields import EncryptedTextField
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.fields import EncryptedTextField
+from enginedj.base.models import M_model_base
 
 
-class M_vehicle_gps(M_audit_base, models.Model):
+class M_vehicle_gps(M_model_base, models.Model):
     """gps_operator / gps_user / gps_password / gps_apikey / gps_secret del .mwb, separados y cifrados (fase 4)."""
 
     model_name = "vehicle_gps"

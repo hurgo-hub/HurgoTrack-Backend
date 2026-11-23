@@ -6,7 +6,7 @@ from apps.apiOdoo.entity import E_odoo_purchase
 from apps.apiOdoo.repository import R_odoo_purchase
 from apps.apiOdoo.services.apiService import ApiOdooService
 from apps.apiOdoo.services.S_odoo_sync_log import S_odoo_sync_log
-from apps.core.exceptions import BusinessError
+from enginedj.base.exceptions import BusinessError
 
 
 class S_odoo_purchase(BaseService[E_odoo_purchase]):

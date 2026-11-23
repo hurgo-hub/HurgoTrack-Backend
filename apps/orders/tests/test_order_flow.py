@@ -6,7 +6,7 @@ import tempfile
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from apps.core.testing import build_world, proof_file, run_workflow
+from apps.testing import build_world, proof_file, run_workflow
 from apps.orders.models import M_order, M_order_line
 
 MEDIA_ROOT = tempfile.mkdtemp()
@@ -140,9 +140,9 @@ class OrderFlowTests(APITestCase):
     def test_lookups(self):
         items = self.ok(run_workflow(self.commercial, "orders.items"))
         self.assertEqual({i["name"] for i in items}, {"UMA 125", "Otra 150", "Cemento"})
-        recipients = self.ok(run_workflow(self.commercial, "companies.recipients", {"q": "concesionario 2"}))
+        recipients = self.ok(run_workflow(self.commercial, "locations.recipients", {"q": "concesionario 2"}))
         self.assertEqual([a["id"] for a in recipients[0]["addresses"]], [self.dealer2_addr.id])
-        self.assertIn("Permisos faltantes", run_workflow(self.driver_user, "companies.recipients").reason)
+        self.assertIn("Permisos faltantes", run_workflow(self.driver_user, "locations.recipients").reason)
 
     def test_end_to_end_tracking(self):
         """Pedido -> confirmación -> viaje -> entrega: el cliente ve todo en el historial del pedido."""

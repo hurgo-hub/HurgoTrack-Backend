@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from enginedj.base.services import BaseService
 
-from apps.core.exceptions import BusinessError, BusinessNotFound
+from enginedj.base.exceptions import BusinessError, BusinessNotFound
 from apps.orders.repository import R_order_line_trip
 from apps.orders.services import S_order_line
 from apps.trips.entity import E_trip_line

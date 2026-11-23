@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_driver_attach(M_audit_base, models.Model):
+class M_driver_attach(M_model_base, models.Model):
     model_name = "driver_attach"
 
     driver_id = models.ForeignKey("drivers.M_driver", on_delete=models.CASCADE, null=False, blank=False,

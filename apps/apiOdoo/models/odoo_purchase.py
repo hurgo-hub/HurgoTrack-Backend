@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_odoo_purchase(M_audit_base, models.Model):
+class M_odoo_purchase(M_model_base, models.Model):
     """Copia local de una compra (purchase.order) de Odoo, la que se confirma en el paso 2."""
 
     model_name = "odoo_purchase"

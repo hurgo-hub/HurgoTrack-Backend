@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_mechanical_inspection(M_audit_base, models.Model):
+class M_mechanical_inspection(M_model_base, models.Model):
     """Revisión técnico-mecánica."""
 
     model_name = "mechanical_inspection"

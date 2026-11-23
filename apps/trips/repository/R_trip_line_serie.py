@@ -2,12 +2,13 @@ from django.utils import timezone
 
 from enginedj.base.repository import BaseRepositoryImpl
 
-from apps.core.cache import InvalidateAppsMixin
+from enginedj.base.cache import InvalidateAppsMixin
 from apps.trips.entity import E_trip_line_serie
 from apps.trips.models import M_trip_line_serie
 
 
 class R_trip_line_serie(InvalidateAppsMixin, BaseRepositoryImpl[E_trip_line_serie]):
+    invalidate_app_labels = ("orders", "trips")  # los listados de viajes y pedidos se cruzan
 
     def __init__(self):
         super().__init__(model=M_trip_line_serie, entity_class=E_trip_line_serie)

@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_location(M_audit_base, models.Model):
+class M_location(M_model_base, models.Model):
     """Departamento o municipio con código DANE. El municipio apunta a su departamento con ``parent_id``."""
 
     model_name = "location"

@@ -2,10 +2,10 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_trip_event(M_audit_base, models.Model):
+class M_trip_event(M_model_base, models.Model):
     """Cada paso del viaje con fecha y responsable: cambios de estado y novedades."""
 
     model_name = "trip_event"

@@ -1,10 +1,10 @@
 from django.db import models
 
-from apps.core.choices import LICENSE_CATEGORY_CHOICES
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.choices import LICENSE_CATEGORY_CHOICES
+from enginedj.base.models import M_model_base
 
 
-class M_vehicle(M_audit_base, models.Model):
+class M_vehicle(M_model_base, models.Model):
     model_name = "vehicle"
 
     fuel_type_choices = [
@@ -18,7 +18,7 @@ class M_vehicle(M_audit_base, models.Model):
         ("automatic", "Automática"),
     ]
 
-    company_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    company_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="vehicle_company_id", db_column="company_id",
                                    help_text="Transportador dueño de la operación (Hurgo o independiente).")
     plate = models.CharField(max_length=10, null=False, blank=False, unique=True)
@@ -44,9 +44,9 @@ class M_vehicle(M_audit_base, models.Model):
     transmission = models.CharField(max_length=10, null=False, blank=True, default="", choices=transmission_choices,
                                     help_text="type_engine del .mwb.")
     plate_transit_free = models.BooleanField(default=False)
-    owner_id = models.ForeignKey("companies.M_partner", on_delete=models.PROTECT, null=False, blank=False,
+    owner_id = models.ForeignKey("fleet.M_partner", on_delete=models.PROTECT, null=False, blank=False,
                                  related_name="vehicle_owner_id", db_column="owner_id", help_text="Propietario.")
-    holder_id = models.ForeignKey("companies.M_partner", on_delete=models.PROTECT, null=True, blank=True,
+    holder_id = models.ForeignKey("fleet.M_partner", on_delete=models.PROTECT, null=True, blank=True,
                                   related_name="vehicle_holder_id", db_column="holder_id",
                                   help_text="other_owner_id del .mwb: tenedor, si es distinto del propietario.")
     default_driver_id = models.ForeignKey("drivers.M_driver", on_delete=models.SET_NULL, null=True, blank=True,

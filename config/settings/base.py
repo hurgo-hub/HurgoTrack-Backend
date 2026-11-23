@@ -20,20 +20,22 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+# La sesión va en cookies (access_token / refresh_token): el frontend usa credentials: "include".
+CORS_ALLOW_CREDENTIALS = True
 
 LANGUAGE_CODE = "es-co"
 TIME_ZONE = "America/Bogota"
 
-# Apps de Hurgo Track, una por grupo del modelo de datos.
+# Apps de Hurgo Track, una por grupo del modelo de datos. El core (tabla ``base``, empresas,
+# usuarios y utilidades compartidas) vive en EngineDj, rama HurgoCore (app ``enginedj.base``).
 INSTALLED_APPS += [
-    "apps.core",
-    "apps.companies",
     "apps.locations",
     "apps.fleet",
     "apps.drivers",
     "apps.orders",
     "apps.trips",
     "apps.apiOdoo",
+    "apps.apiSatrack",
 ]
 
 # Integración con Odoo (app apps.apiOdoo). Apagada por defecto: con
@@ -46,6 +48,26 @@ ODOO_API_KEY = env("ODOO_API_KEY", default="")
 ODOO_TIMEOUT = env.int("ODOO_TIMEOUT", default=20)
 # Estados de purchase.order que permiten confirmar el pedido en Hurgo Track.
 ODOO_CONFIRMED_PURCHASE_STATES = env.list("ODOO_CONFIRMED_PURCHASE_STATES", default=["purchase", "done"])
+
+# Integración con Satrack (app apps.apiSatrack): posiciones GPS para el mapa.
+# Doc: https://developer.satrack.com. Token por Keycloak (externalsecurityapi) y
+# posiciones por GraphQL (locationintegrationapi). Con SATRACK_ENABLED=False el
+# mapa sigue funcionando con origen y paradas, sin vehículos.
+# Credenciales: SATRACK_CLIENT_ID + (SATRACK_USERNAME y SATRACK_PASSWORD) o
+# SATRACK_CLIENT_SECRET. Un vehículo con GPS propio (fleet.M_vehicle_gps, operador
+# "Satrack") usa sus credenciales: username/password y api_key = client id,
+# api_secret = client secret.
+SATRACK_ENABLED = env.bool("SATRACK_ENABLED", default=False)
+SATRACK_AUTH_URL = env("SATRACK_AUTH_URL", default="https://externalsecurityapi.satrack.com")
+SATRACK_LOCATION_URL = env("SATRACK_LOCATION_URL", default="https://locationintegrationapi.satrack.com/api")
+SATRACK_CLIENT_ID = env("SATRACK_CLIENT_ID", default="")
+SATRACK_CLIENT_SECRET = env("SATRACK_CLIENT_SECRET", default="")
+SATRACK_USERNAME = env("SATRACK_USERNAME", default="")
+SATRACK_PASSWORD = env("SATRACK_PASSWORD", default="")
+SATRACK_TIMEOUT = env.int("SATRACK_TIMEOUT", default=20)
+# Segundos que se reutiliza la última posición de un vehículo (el frontend puede
+# refrescar el mapa seguido sin pegarle a Satrack en cada petición).
+SATRACK_POSITIONS_CACHE_SECONDS = env.int("SATRACK_POSITIONS_CACHE_SECONDS", default=30)
 
 # Clave Fernet para cifrar credenciales (GPS). Generar con:
 #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
