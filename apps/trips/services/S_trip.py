@@ -16,9 +16,9 @@ from django.utils import timezone
 
 from enginedj.base.services import BaseService
 
-from apps.companies.repository import R_company
-from apps.core.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
-from apps.core.permissions import has_perm, require_perm, user_company_ids
+from enginedj.base.repository import R_company
+from enginedj.base.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
+from enginedj.base.services.permissions import has_perm, require_perm, user_company_ids
 from apps.locations.repository import R_address
 from apps.orders.repository import R_order_line, R_order_line_trip
 from apps.orders.services import S_order_line
@@ -86,7 +86,7 @@ class S_trip(BaseService[E_trip]):
 
         trip = self.repository.create_trip(company_id=company, origin_address_id=origin,
                                            planned_departure=planned_departure, notes=notes or "",
-                                           create_user_id=user)
+                                           create_user=user)
         self.events.register(trip, user, "Viaje armado", to_state="draft")
         self._allocate(trip, user, allocations)
         return trip
@@ -142,7 +142,7 @@ class S_trip(BaseService[E_trip]):
             stop = stops.get(key)
             if stop is None:
                 stop = self.r_line.create_stop(trip_id=trip, sequence=next_sequence, recipient_id_id=key[0],
-                                               address_id_id=key[1], create_user_id=user)
+                                               address_id_id=key[1], create_user=user)
                 stops[key] = stop
                 next_sequence += 1
             self.r_allocation.add_qty(line, stop, qty, user)
@@ -275,15 +275,15 @@ class S_trip(BaseService[E_trip]):
         return_trip = self.repository.create_trip(
             company_id_id=trip.company_id_id, trip_type="return", brand_id_id=trip.brand_id_id,
             origin_address_id=origin, parent_trip_id=trip, returned_line_id=stop,
-            notes=f"Devolución de {trip.code}, parada {stop.sequence}: {stop.return_reason}", create_user_id=user,
+            notes=f"Devolución de {trip.code}, parada {stop.sequence}: {stop.return_reason}", create_user=user,
         )
         return_stop = self.r_line.create_stop(trip_id=return_trip, sequence=1, recipient_id_id=warehouse.company_id_id,
                                               address_id=warehouse, qty=stop.qty, weight_kg=stop.weight_kg,
-                                              create_user_id=user)
+                                              create_user=user)
         r_serie = R_trip_line_serie()
         for serie in r_serie.of_stop(stop):
             r_serie.create_serie(trip_line_id=return_stop, vin=serie.vin, engine_number=serie.engine_number,
-                                 create_user_id=user)
+                                 create_user=user)
         self.events.register(return_trip, user, "Viaje de regreso armado", to_state="draft",
                              description=f"Desde {trip.code}, parada {stop.sequence}")
         self.events.register(trip, user, f"Viaje de regreso {return_trip.code} creado", event_type="comment", line=stop)

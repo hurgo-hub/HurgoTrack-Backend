@@ -4,12 +4,13 @@ from django.db.models import Sum
 
 from enginedj.base.repository import BaseRepositoryImpl
 
-from apps.core.cache import InvalidateAppsMixin
+from enginedj.base.cache import InvalidateAppsMixin
 from apps.orders.entity import E_order_line
 from apps.orders.models import M_order_line, M_order_line_trip
 
 
 class R_order_line(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line]):
+    invalidate_app_labels = ("orders", "trips")  # los listados de viajes y pedidos se cruzan
 
     def __init__(self):
         super().__init__(model=M_order_line, entity_class=E_order_line)
@@ -40,7 +41,7 @@ class R_order_line(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line]):
         from django.utils import timezone
 
         self.model.objects.filter(order_id=order).exclude(state="cancelled").update(
-            state="cancelled", update_user_id=user, update_date=timezone.now()
+            state="cancelled", update_user=user, update_date=timezone.now()
         )
         self._invalidate_list_cache()
 
@@ -67,7 +68,7 @@ class R_order_line(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line]):
                     line.state = "partial"
                 else:
                     line.state = "pending"
-            line.update_user_id = user
+            line.update_user = user
             line.save()
             order_ids.add(line.order_id_id)
         self._invalidate_list_cache()

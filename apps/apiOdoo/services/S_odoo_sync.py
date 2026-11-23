@@ -13,8 +13,8 @@ from django.utils.html import escape
 from apps.apiOdoo.services.apiService import ApiOdooService
 from apps.apiOdoo.services.S_odoo_purchase import S_odoo_purchase
 from apps.apiOdoo.services.S_odoo_sync_log import S_odoo_sync_log
-from apps.core.exceptions import BusinessError, BusinessNotFound
-from apps.core.permissions import require_perm
+from enginedj.base.exceptions import BusinessError, BusinessNotFound
+from enginedj.base.services.permissions import require_perm
 
 
 def split_vat(vat: str) -> tuple[str, str]:
@@ -33,7 +33,7 @@ class S_odoo_sync:
     @transaction.atomic
     def sync_partners(self, user, domain=None, limit=None) -> dict:
         """Crea / actualiza empresas desde Odoo. Las que no tienen NIT (vat) se omiten."""
-        from apps.companies.models import M_company
+        from enginedj.base.models import M_company
 
         require_perm(user, "apiOdoo.sync_odoo", "No tienes permiso para sincronizar con Odoo.")
         partners = self.api.get_partners(domain, limit)
@@ -49,12 +49,12 @@ class S_odoo_sync:
                       "email": partner.get("email") or "", "phone": partner.get("phone") or "",
                       "odoo_ref": str(partner["id"])}
             if company is None:
-                M_company.objects.create(create_user_id=user, **values)
+                M_company.objects.create(create_user=user, **values)
                 summary["created"] += 1
             else:
                 for key, value in values.items():
                     setattr(company, key, value)
-                company.update_user_id = user
+                company.update_user = user
                 company.save()
                 summary["updated"] += 1
         self.log.success("sync_partners", summary, odoo_model="res.partner", user=user)
@@ -63,7 +63,7 @@ class S_odoo_sync:
     @transaction.atomic
     def sync_products(self, user, company_id, type_item_id, domain=None, limit=None) -> dict:
         """Crea / actualiza productos de una empresa cliente desde Odoo."""
-        from apps.companies.models import M_company
+        from enginedj.base.models import M_company
         from apps.orders.models import M_item, M_type_item
 
         require_perm(user, "apiOdoo.sync_odoo", "No tienes permiso para sincronizar con Odoo.")
@@ -78,12 +78,12 @@ class S_odoo_sync:
             item = M_item.objects.filter(company_id=company, odoo_ref=str(product["id"])).first()
             if item is None:
                 M_item.objects.create(company_id=company, type_item_id=type_item, odoo_ref=str(product["id"]),
-                                      is_serialized=type_item.is_serialized, create_user_id=user, **values)
+                                      is_serialized=type_item.is_serialized, create_user=user, **values)
                 summary["created"] += 1
             else:
                 for key, value in values.items():
                     setattr(item, key, value)
-                item.update_user_id = user
+                item.update_user = user
                 item.save()
                 summary["updated"] += 1
         self.log.success("sync_products", summary, odoo_model="product.product", reference=company.name, user=user)

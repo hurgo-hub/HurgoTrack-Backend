@@ -1,11 +1,12 @@
 from enginedj.base.repository import BaseRepositoryImpl
 
-from apps.core.cache import InvalidateAppsMixin
+from enginedj.base.cache import InvalidateAppsMixin
 from apps.trips.entity import E_trip_type_attach
 from apps.trips.models import M_trip_type_attach
 
 
 class R_trip_type_attach(InvalidateAppsMixin, BaseRepositoryImpl[E_trip_type_attach]):
+    invalidate_app_labels = ("orders", "trips")  # los listados de viajes y pedidos se cruzan
 
     def __init__(self):
         super().__init__(model=M_trip_type_attach, entity_class=E_trip_type_attach)

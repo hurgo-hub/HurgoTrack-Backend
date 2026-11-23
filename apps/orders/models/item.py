@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_item(M_audit_base, models.Model):
+class M_item(M_model_base, models.Model):
     """Producto. ``company_id`` (base_idbase del .mwb): empresa cliente dueña del catálogo."""
 
     model_name = "item"
@@ -16,7 +16,7 @@ class M_item(M_audit_base, models.Model):
         ("m3", "Metro cúbico"),
     ]
 
-    company_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    company_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="item_company_id", db_column="company_id")
     type_item_id = models.ForeignKey("orders.M_type_item", on_delete=models.PROTECT, null=False, blank=False,
                                      related_name="item_type_item_id", db_column="type_item_id")

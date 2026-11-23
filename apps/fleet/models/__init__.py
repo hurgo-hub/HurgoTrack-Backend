@@ -1,3 +1,4 @@
+from .partner import *
 from .type_vehicle import *
 from .brand_vehicle import *
 from .bodywork import *

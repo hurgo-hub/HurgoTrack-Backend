@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_order(M_audit_base, models.Model):
+class M_order(M_model_base, models.Model):
     """``order_dtd`` del .mwb: pedido de una empresa cliente.
 
     El destino (destinatario + dirección) va en cada línea, como en
@@ -23,7 +23,7 @@ class M_order(M_audit_base, models.Model):
     ]
 
     code = models.CharField(max_length=20, null=False, blank=False, unique=True, editable=False)
-    company_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    company_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="order_company_id", db_column="company_id",
                                    help_text="Empresa cliente que pide.")
     address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=False, blank=False,

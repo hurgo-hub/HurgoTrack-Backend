@@ -6,3 +6,7 @@ class LocationsConfig(AppConfig):
     name = "apps.locations"
     label = "locations"
     verbose_name = "Direcciones"
+
+    def ready(self):
+        # Importar los steps para registrarlos en el motor
+        import apps.locations.steps.stp_address  # noqa: F401

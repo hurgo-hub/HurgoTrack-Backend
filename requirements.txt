@@ -1,0 +1,4 @@
+# Motor: siempre la versión vH0.1.0 (rama HurgoCore de EngineDj, donde vive el core de Hurgo Track).
+enginedj[postgres] @ git+https://github.com/Dev-lopp/EngineDj.git@vH0.1.0
+# Cliente JSON-RPC de Odoo (apps.apiOdoo)
+requests>=2.32,<3

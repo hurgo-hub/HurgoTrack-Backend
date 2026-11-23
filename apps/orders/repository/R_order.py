@@ -2,12 +2,13 @@ from django.db.models import Prefetch
 
 from enginedj.base.repository import BaseRepositoryImpl
 
-from apps.core.cache import InvalidateAppsMixin
+from enginedj.base.cache import InvalidateAppsMixin
 from apps.orders.entity import E_order
 from apps.orders.models import M_order, M_order_event, M_order_line, M_order_line_trip
 
 
 class R_order(InvalidateAppsMixin, BaseRepositoryImpl[E_order]):
+    invalidate_app_labels = ("orders", "trips")  # los listados de viajes y pedidos se cruzan
 
     def __init__(self):
         super().__init__(model=M_order, entity_class=E_order)
@@ -27,13 +28,13 @@ class R_order(InvalidateAppsMixin, BaseRepositoryImpl[E_order]):
         order.state = new_state
         for name, value in fields.items():
             setattr(order, name, value)
-        order.update_user_id = user
+        order.update_user = user
         order.save()
         self._invalidate_list_cache()
         return old_state
 
     def save_order(self, order: M_order, user):
-        order.update_user_id = user
+        order.update_user = user
         order.save()
         self._invalidate_list_cache()
 
@@ -45,7 +46,7 @@ class R_order(InvalidateAppsMixin, BaseRepositoryImpl[E_order]):
         return qs
 
     def with_detail(self, qs):
-        return qs.select_related("company_id", "address_id__location_id", "create_user_id").prefetch_related(
+        return qs.select_related("company_id", "address_id__location_id", "create_user").prefetch_related(
             Prefetch(
                 "order_line_order_id",
                 queryset=M_order_line.objects.select_related(

@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_odoo_sync_log(M_audit_base, models.Model):
+class M_odoo_sync_log(M_model_base, models.Model):
     """Bitácora de cada llamada a Odoo: qué se pidió, qué respondió y si falló."""
 
     model_name = "odoo_sync_log"

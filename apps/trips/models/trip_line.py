@@ -1,10 +1,10 @@
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_trip_line(M_audit_base, models.Model):
+class M_trip_line(M_model_base, models.Model):
     """Parada del viaje: una entrega a un destinatario en una dirección."""
 
     model_name = "trip_line"
@@ -20,7 +20,7 @@ class M_trip_line(M_audit_base, models.Model):
     trip_id = models.ForeignKey("trips.M_trip", on_delete=models.CASCADE, null=False, blank=False,
                                 related_name="trip_line_trip_id", db_column="trip_id")
     sequence = models.PositiveSmallIntegerField(null=False, blank=False, default=1, help_text="ord del .mwb.")
-    recipient_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    recipient_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                      related_name="trip_line_recipient_id", db_column="recipient_id",
                                      help_text="company_id_to del .mwb.")
     address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=False, blank=False,

@@ -27,7 +27,7 @@ class R_odoo_purchase(BaseRepositoryImpl[E_odoo_purchase]):
             "amount_total": data.get("amount_total"),
             "raw": data,
             "synced_date": timezone.now(),
-            "update_user_id": user,
+            "update_user": user,
         }
         if values["date_order"] is not None and timezone.is_naive(values["date_order"]):
             values["date_order"] = timezone.make_aware(values["date_order"], dt_timezone.utc)

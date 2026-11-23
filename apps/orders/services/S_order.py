@@ -16,9 +16,9 @@ from django.utils import timezone
 
 from enginedj.base.services import BaseService
 
-from apps.companies.repository import R_company
-from apps.core.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
-from apps.core.permissions import has_perm, require_perm, user_company_ids
+from enginedj.base.repository import R_company
+from enginedj.base.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
+from enginedj.base.services.permissions import has_perm, require_perm, user_company_ids
 from apps.locations.repository import R_address
 from apps.orders.entity import E_order
 from apps.orders.models import M_order_line
@@ -133,7 +133,7 @@ class S_order(BaseService[E_order]):
             if item.is_serialized and qty != qty.to_integral_value():
                 raise BusinessError(f"{item} se pide por unidades enteras.", code="integer_qty")
             rows.append(M_order_line(order_id=order, item_id=item, recipient_id=recipient, address_id=address,
-                                     qty=qty, create_user_id=user))
+                                     qty=qty, create_user=user))
         return rows
 
     # ------------------------------------------------------------------
@@ -146,7 +146,7 @@ class S_order(BaseService[E_order]):
         origin = self._resolve_origin(company, address_id)
         order = self.repository.create_order(
             company_id=company, address_id=origin, order_date=order_date or timezone.localdate(),
-            notes=notes or "", state="draft", create_user_id=user,
+            notes=notes or "", state="draft", create_user=user,
         )
         self.r_event.register(order, user, "Pedido creado", to_state="draft")
         self.r_line.replace_lines(order, self._build_lines(order, user, lines))

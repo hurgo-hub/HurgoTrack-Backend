@@ -7,7 +7,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # Motor: auth por cookies (api/auth/token/, token/refresh/, logout/) y workflows.
     # Las apps de Hurgo exponen sus acciones como workflows:
-    #   POST /api/workflows/sync/<nombre>/  (ver apps/core/management/commands/seed_hurgo.py)
+    #   POST /api/workflows/sync/<nombre>/  (el seeds.py de cada app; python manage.py seed_workflows)
     path("api/", include("enginedj.urls")),
 ]
 

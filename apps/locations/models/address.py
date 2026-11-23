@@ -1,14 +1,14 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_address(M_audit_base, models.Model):
+class M_address(M_model_base, models.Model):
     """Dirección de una empresa: bodega de cargue o punto de entrega."""
 
     model_name = "address"
 
-    company_id = models.ForeignKey("companies.M_company", on_delete=models.PROTECT, null=False, blank=False,
+    company_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="address_company_id", db_column="company_id")
     location_id = models.ForeignKey("locations.M_location", on_delete=models.PROTECT, null=False, blank=False,
                                     related_name="address_location_id", db_column="location_id",

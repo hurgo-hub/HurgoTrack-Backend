@@ -11,7 +11,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 
-from apps.core.exceptions import BusinessError
+from enginedj.base.exceptions import BusinessError
 
 
 class OdooError(BusinessError):

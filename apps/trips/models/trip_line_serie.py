@@ -1,9 +1,9 @@
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_trip_line_serie(M_audit_base, models.Model):
+class M_trip_line_serie(M_model_base, models.Model):
     """Una moto (unidad serializada) de una parada, identificada por su VIN."""
 
     model_name = "trip_line_serie"

@@ -2,7 +2,7 @@
 
 from enginedj.modules.registry import register_module
 
-from apps.core.steps import context_user, results, validate_input
+from enginedj.base.steps.helpers import context_user, results, validate_input
 from apps.trips.serializers import (
     Sz_allocations_in,
     Sz_assign_in,
@@ -11,8 +11,8 @@ from apps.trips.serializers import (
     Sz_return_trip_in,
     Sz_trip_build_in,
     Sz_trip_detail,
+    Sz_trip_driver,
     Sz_trip_id_in,
-    Sz_trip_list,
 )
 from apps.trips.services import S_trip
 
@@ -94,4 +94,4 @@ def list_trips(context, params, execution):
 @register_module("trips.mine", important=True)
 def my_trips(context, params, execution):
     """Paso 4: viajes activos del conductor (app móvil)."""
-    return results(Sz_trip_list(S_trip().mine(context_user(context)), many=True).data)
+    return results(Sz_trip_driver(S_trip().mine(context_user(context)), many=True).data)

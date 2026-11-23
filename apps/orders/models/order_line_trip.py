@@ -3,10 +3,10 @@ from decimal import Decimal
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from apps.core.models.model_base import M_audit_base
+from enginedj.base.models import M_model_base
 
 
-class M_order_line_trip(M_audit_base, models.Model):
+class M_order_line_trip(M_model_base, models.Model):
     """``order_dtd_detail`` del .mwb: parte de una línea de pedido que va en una parada de un viaje."""
 
     model_name = "order_line_trip"

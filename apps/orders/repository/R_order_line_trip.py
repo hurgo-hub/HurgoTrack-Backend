@@ -2,12 +2,13 @@ from django.db.models import Sum
 
 from enginedj.base.repository import BaseRepositoryImpl
 
-from apps.core.cache import InvalidateAppsMixin
+from enginedj.base.cache import InvalidateAppsMixin
 from apps.orders.entity import E_order_line_trip
 from apps.orders.models import M_order_line_trip
 
 
 class R_order_line_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line_trip]):
+    invalidate_app_labels = ("orders", "trips")  # los listados de viajes y pedidos se cruzan
 
     def __init__(self):
         super().__init__(model=M_order_line_trip, entity_class=E_order_line_trip)
@@ -15,11 +16,11 @@ class R_order_line_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line_tri
 
     def add_qty(self, order_line, trip_line, qty, user) -> M_order_line_trip:
         allocation, created = self.model.objects.get_or_create(
-            order_line_id=order_line, trip_line_id=trip_line, defaults={"qty": qty, "create_user_id": user}
+            order_line_id=order_line, trip_line_id=trip_line, defaults={"qty": qty, "create_user": user}
         )
         if not created:
             allocation.qty += qty
-            allocation.update_user_id = user
+            allocation.update_user = user
             allocation.save()
         self._invalidate_list_cache()
         return allocation

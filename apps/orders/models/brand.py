@@ -1,6 +1,6 @@
 from django.db import models
 
-from apps.core.models.model_base import M_catalog_base
+from enginedj.base.models import M_catalog_base
 
 
 class M_brand(M_catalog_base, models.Model):
@@ -8,7 +8,7 @@ class M_brand(M_catalog_base, models.Model):
 
     model_name = "brand"
 
-    company_id = models.ForeignKey("companies.M_company", on_delete=models.SET_NULL, null=True, blank=True,
+    company_id = models.ForeignKey("base.M_company", on_delete=models.SET_NULL, null=True, blank=True,
                                    related_name="brand_company_id", db_column="company_id",
                                    help_text="Empresa cliente dueña de la marca, si aplica.")
 

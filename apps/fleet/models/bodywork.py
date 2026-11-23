@@ -1,6 +1,6 @@
 from django.db import models
 
-from apps.core.models.model_base import M_catalog_base
+from enginedj.base.models import M_catalog_base
 
 
 class M_bodywork(M_catalog_base, models.Model):

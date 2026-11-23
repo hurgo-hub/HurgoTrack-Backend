@@ -2,7 +2,7 @@ from django.db.models import Max, Prefetch, Sum
 
 from enginedj.base.repository import BaseRepositoryImpl
 
-from apps.core.cache import InvalidateAppsMixin
+from enginedj.base.cache import InvalidateAppsMixin
 from apps.trips.entity import E_trip
 from apps.trips.models import M_trip, M_trip_event, M_trip_line
 
@@ -11,6 +11,7 @@ LIST_RELATED = ("company_id", "brand_id", "vehicle_id", "driver_id__user_id", "o
 
 
 class R_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_trip]):
+    invalidate_app_labels = ("orders", "trips")  # los listados de viajes y pedidos se cruzan
 
     def __init__(self):
         super().__init__(model=M_trip, entity_class=E_trip)
@@ -26,9 +27,9 @@ class R_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_trip]):
         return trip
 
     def save_trip(self, trip: M_trip, user, update_fields=None):
-        trip.update_user_id = user
+        trip.update_user = user
         if update_fields:
-            trip.save(update_fields=[*update_fields, "update_user_id", "update_date"])
+            trip.save(update_fields=[*update_fields, "update_user", "update_date"])
         else:
             trip.save()
         self._invalidate_list_cache()
@@ -102,6 +103,9 @@ class R_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_trip]):
         )
 
     def active_for_driver_user(self, user):
-        return self.with_list(
-            self.model.objects.filter(is_active=True, driver_id__user_id=user, state__in=BUSY_STATES)
+        """Viajes activos del conductor con sus paradas (lista de la app móvil)."""
+        qs = self.model.objects.filter(is_active=True, driver_id__user_id=user, state__in=BUSY_STATES)
+        return self.with_list(qs).select_related("origin_address_id__location_id").prefetch_related(
+            Prefetch("trip_line_trip_id",
+                     queryset=M_trip_line.objects.select_related("recipient_id", "address_id__location_id")),
         ).order_by("planned_departure", "id")

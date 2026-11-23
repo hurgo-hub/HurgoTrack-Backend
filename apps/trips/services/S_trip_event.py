@@ -2,8 +2,8 @@ from django.db import transaction
 
 from enginedj.base.services import BaseService
 
-from apps.core.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
-from apps.core.permissions import has_perm
+from enginedj.base.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
+from enginedj.base.services.permissions import has_perm
 from apps.trips.entity import E_trip_event
 from apps.trips.repository import R_trip, R_trip_event, R_trip_line
 

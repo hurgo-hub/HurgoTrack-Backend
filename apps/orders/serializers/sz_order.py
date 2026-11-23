@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from apps.core.serializers import person
+from enginedj.base.serializers.sz_common import person
 from apps.orders.models import M_item, M_order, M_order_event, M_order_line
 
 
@@ -84,7 +84,7 @@ class Sz_order_detail(serializers.ModelSerializer):
         return _address(obj.address_id)
 
     def get_created_by(self, obj):
-        return person(obj.create_user_id)
+        return person(obj.create_user)
 
 
 class Sz_item_lookup(serializers.ModelSerializer):

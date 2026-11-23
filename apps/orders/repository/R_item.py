@@ -2,12 +2,13 @@ from django.db.models import Q
 
 from enginedj.base.repository import BaseRepositoryImpl
 
-from apps.core.cache import InvalidateAppsMixin
+from enginedj.base.cache import InvalidateAppsMixin
 from apps.orders.entity import E_item
 from apps.orders.models import M_item
 
 
 class R_item(InvalidateAppsMixin, BaseRepositoryImpl[E_item]):
+    invalidate_app_labels = ("orders", "trips")  # los listados de viajes y pedidos se cruzan
 
     def __init__(self):
         super().__init__(model=M_item, entity_class=E_item)

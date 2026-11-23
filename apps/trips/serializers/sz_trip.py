@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.core.validators import FileExtensionValidator
 from rest_framework import serializers
 
-from apps.core.serializers import Sz_position_in, person
+from enginedj.base.serializers.sz_common import Sz_position_in, person
 from apps.trips.models import M_trip, M_trip_attach, M_trip_event, M_trip_line, M_trip_line_serie
 
 ATTACH_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "heic", "heif", "pdf"]
@@ -111,6 +111,44 @@ class Sz_trip_list(serializers.ModelSerializer):
 
     def get_driver(self, obj):
         return person(obj.driver_id.user_id) if obj.driver_id_id else None
+
+
+class Sz_trip_driver(Sz_trip_list):
+    """Viaje en la lista de la app del conductor (``trips.mine``): resumen de paradas para la tarjeta.
+
+    Espera las paradas precargadas (``R_trip.active_for_driver_user``).
+    """
+
+    origin_location = serializers.CharField(source="origin_address_id.location_id.name", read_only=True)
+    destination = serializers.SerializerMethodField()
+    stops_total = serializers.SerializerMethodField()
+    stops_done = serializers.SerializerMethodField()
+    total_qty = serializers.SerializerMethodField()
+
+    class Meta(Sz_trip_list.Meta):
+        fields = Sz_trip_list.Meta.fields + ["origin_location", "destination", "stops_total", "stops_done",
+                                             "total_qty"]
+
+    @staticmethod
+    def _stops(obj):
+        return sorted((line for line in obj.trip_line_trip_id.all() if line.is_active), key=lambda l: l.sequence)
+
+    def get_destination(self, obj):
+        stops = self._stops(obj)
+        if not stops:
+            return None
+        last = stops[-1]
+        return {"recipient": last.recipient_id.name, "name": last.address_id.name,
+                "location": last.address_id.location_id.name}
+
+    def get_stops_total(self, obj):
+        return len(self._stops(obj))
+
+    def get_stops_done(self, obj):
+        return sum(1 for line in self._stops(obj) if line.state in ("delivered", "returned"))
+
+    def get_total_qty(self, obj):
+        return str(sum((line.qty for line in self._stops(obj)), Decimal("0")))
 
 
 class Sz_trip_detail(Sz_trip_list):

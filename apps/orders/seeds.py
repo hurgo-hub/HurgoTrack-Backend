@@ -1,0 +1,30 @@
+"""Permisos y workflows de pedidos (pasos 1 y 2). Ver ``manage.py seed_workflows``."""
+
+ROLES = {
+    "administracion": ["orders.*"],
+    "despacho": [
+        "orders.view_m_*",
+        "orders.add_m_order", "orders.change_m_order", "orders.submit_order", "orders.cancel_order",
+        "orders.confirm_order", "orders.cancel_confirmed_order", "orders.view_all_order",
+        "orders.create_any_company_order",
+    ],
+    "comercial": [
+        "orders.view_m_order", "orders.add_m_order", "orders.change_m_order", "orders.submit_order",
+        "orders.cancel_order", "orders.view_m_order_line", "orders.view_m_order_event",
+        "orders.view_m_item", "orders.view_m_type_item", "orders.view_m_brand",
+    ],
+}
+
+# workflow (= step) -> permisos que valida ``validate.permission`` antes del step.
+# Los servicios vuelven a validar.
+WORKFLOWS = {
+    "orders.create": ["orders.add_m_order"],
+    "orders.update": ["orders.change_m_order"],
+    "orders.submit": ["orders.submit_order"],
+    "orders.confirm": ["orders.confirm_order"],
+    "orders.cancel": ["orders.view_m_order"],  # el servicio decide entre cancel_order y cancel_confirmed_order
+    "orders.retrieve": ["orders.view_m_order"],
+    "orders.list": ["orders.view_m_order"],
+    "orders.items": ["orders.add_m_order"],
+    "orders.pending_lines": ["trips.build_trip"],
+}
