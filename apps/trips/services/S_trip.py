@@ -351,6 +351,20 @@ class S_trip(BaseService[E_trip]):
         data.pop("user", None)
         return self.list_with_relations_m2m(user=user, **data)
 
+    def resources(self, user):
+        """Vehículos y conductores activos (la asignación valida documentos y disponibilidad)."""
+        from apps.drivers.models import M_driver
+        from apps.fleet.models import M_vehicle
+
+        require_perm(user, "trips.assign_trip", "Solo el equipo de despacho asigna viajes.")
+        vehicles = M_vehicle.objects.filter(is_active=True).select_related("type_vehicle_id").order_by("plate")
+        drivers = M_driver.objects.filter(is_active=True).select_related("user_id").order_by("user_id__first_name")
+        return {
+            "vehicles": [{"id": v.id, "name": f"{v.plate} · {v.type_vehicle_id.name}", "is_available": v.is_available}
+                         for v in vehicles],
+            "drivers": [{"id": d.id, "name": str(d), "is_available": d.is_available} for d in drivers],
+        }
+
     def mine(self, user):
         require_perm(user, "trips.drive_trip", "Solo los conductores tienen viajes asignados.")
         return list(self.repository.active_for_driver_user(user))

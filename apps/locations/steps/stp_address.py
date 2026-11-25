@@ -51,3 +51,9 @@ def loading_tags(context, params, execution):
 def create_loading_tag(context, params, execution):
     data = validate_input(Sz_tag_in, context)
     return results(Sz_loading_tag(S_address().create_tag(context_user(context), data["name"])).data)
+
+
+@register_module("locations.lookups", important=True)
+def lookups(context, params, execution):
+    """Listas para los formularios de Hurgo: empresas activas (con su rol) y municipios."""
+    return results(S_address().lookups(context_user(context)))

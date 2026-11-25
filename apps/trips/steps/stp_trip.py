@@ -95,3 +95,9 @@ def list_trips(context, params, execution):
 def my_trips(context, params, execution):
     """Paso 4: viajes activos del conductor (app móvil)."""
     return results(Sz_trip_driver(S_trip().mine(context_user(context)), many=True).data)
+
+
+@register_module("trips.resources", important=True)
+def resources(context, params, execution):
+    """Vehículos y conductores activos para asignar a un viaje."""
+    return results(S_trip().resources(context_user(context)))

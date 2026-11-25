@@ -95,6 +95,7 @@ services:
     # Solo el dominio: Caddy no necesita las demás claves.
     environment:
       API_DOMAIN: ${API_DOMAIN:-localhost}
+      FRONT_DOMAIN: ${FRONT_DOMAIN:-hurgotrackfront.devloop.com.co}
     depends_on:
       - web
     ports:

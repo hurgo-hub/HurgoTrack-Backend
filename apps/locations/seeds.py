@@ -12,5 +12,6 @@ WORKFLOWS = {
     "locations.loading_points": ["locations.view_m_address"],
     "locations.loading_point.save": ["locations.manage_loading_point"],
     "locations.loading_tags": ["locations.view_m_loading_tag"],
+    "locations.lookups": ["locations.view_m_address"],
     "locations.loading_tag.create": ["locations.manage_loading_point"],
 }

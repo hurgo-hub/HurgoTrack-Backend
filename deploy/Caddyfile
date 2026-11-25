@@ -30,6 +30,13 @@
 	import hurgotrack
 }
 
+# Frontend (Next.js): otro compose (repo HurgoTrack-Frontend) en la misma red de Docker.
+# Si el contenedor no está arriba, este dominio da 502 y el resto sigue igual.
+{$FRONT_DOMAIN:hurgotrackfront.devloop.com.co} {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}
+
 # Por IP y sin HTTPS, solo para revisar que el servidor responde mientras el DNS
 # no apunta al VPS. El login por cookies no funciona aquí (exige HTTPS).
 :80 {

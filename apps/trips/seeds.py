@@ -26,6 +26,7 @@ WORKFLOWS = {
     "trips.add_allocations": ["trips.build_trip"],
     "trips.register_series": ["trips.register_series_trip"],
     "trips.assign": ["trips.assign_trip"],
+    "trips.resources": ["trips.assign_trip"],
     "trips.cancel": ["trips.cancel_trip"],
     "trips.create_return_trip": ["trips.create_return_trip"],
     "trips.mine": ["trips.drive_trip"],
