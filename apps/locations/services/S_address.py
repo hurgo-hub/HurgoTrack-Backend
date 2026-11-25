@@ -116,3 +116,20 @@ class S_address(BaseService[E_address]):
         if self.r_tag.get_by_name(name):
             raise BusinessError(f"La etiqueta '{name}' ya existe.", code="duplicate_tag")
         return self.r_tag.create_tag(name, user)
+
+    # ------------------------------------------------------------------
+    # Listas para formularios
+    # ------------------------------------------------------------------
+    def lookups(self, user):
+        self._require_dispatch(user)
+        companies = M_company.objects.filter(is_active=True).order_by("name").values(
+            "id", "name", "is_client", "is_recipient", "is_carrier")
+        municipalities = M_location.objects.filter(is_active=True, location_type="municipality").select_related(
+            "parent_id").order_by("name")
+        return {
+            "companies": list(companies),
+            "municipalities": [
+                {"id": m.id, "name": f"{m.name} ({m.parent_id.name})" if m.parent_id_id else m.name}
+                for m in municipalities
+            ],
+        }
