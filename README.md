@@ -50,35 +50,43 @@ Redis para caché, WebSockets y Celery).
   Caddy pregunta a `/api/auth/session/status/` con las mismas cookies.
 - Al arrancar, `web` corre `migrate`, `collectstatic` y `seed_workflows`.
 
-### Despliegue desde tu PC
+### Despliegue (el VPS baja de GitHub)
 
-El VPS no necesita acceso a GitHub: `deploy/deploy.sh` (en WSL) arma el core
-desde la etiqueta `vH0.1.0` de tu carpeta `EngineDj`, empaqueta este backend tal
-como está en tu carpeta (sin `.env`, `.venv` ni `media`) y lo sube por SSH a
-`~/HurgoTrack/backend`. Allí conserva el `.env` del servidor, deja el release
-anterior en `~/HurgoTrack/backend.prev` y corre `docker compose build` + `up`.
+En el VPS, `~/HurgoTrack/backend` es un clon de
+[hurgo-hub/HurgoTrack-Backend](https://github.com/hurgo-hub/HurgoTrack-Backend)
+(rama `main`). `deploy/update.sh` hace `git pull`, arma el core desde la
+etiqueta `vH0.1.0` y corre `docker compose build` + `up`. El `.env` y el
+`.env.backup` de esa carpeta están en `.gitignore`: git no los toca.
 
-Usa el `ssh.exe` de Windows con la llave cargada en el ssh-agent:
+El core es privado (`Dev-lopp/EngineDj`). El VPS lo baja a `~/HurgoTrack/enginedj`
+con una **deploy key de solo lectura** (`~/.ssh/deploy_enginedj`, alias
+`github-enginedj` en `~/.ssh/config`), que agrega el dueño del repo en
+*Settings → Deploy keys* sin permiso de escritura. Mientras no esté, `update.sh`
+usa el paquete del core que ya hay en `vendor/`.
 
-```powershell
-ssh-add C:\Users\TUF\.ssh\id_contabo
-```
-
-Primera vez (crea el `.env` del VPS con claves nuevas):
-
-```bash
-API_DOMAIN=api.midominio.com FRONTEND_ORIGIN=https://app.midominio.com ./deploy/deploy.sh
-docker compose exec web python manage.py createsuperuser   # en el VPS
-```
-
-Cada despliegue:
+Desplegar lo que está en GitHub (desde tu PC o en el VPS):
 
 ```bash
-./deploy/deploy.sh
+./deploy/deploy.sh                          # PC: le pide al VPS que se actualice
+~/HurgoTrack/backend/deploy/update.sh       # o directamente en el VPS
 ```
 
-Si moviste la etiqueta `vH0.1.0`, el paquete del core cambia y Docker lo
-reinstala. Lo que quedó desplegado está en `~/HurgoTrack/backend/RELEASE`.
+`deploy.sh` usa el `ssh.exe` de Windows con la llave en el ssh-agent
+(`ssh-add C:\Users\TUF\.ssh\id_contabo`) y avisa si tienes cambios sin
+subir: se despliega lo que está en `origin/main`, no tu carpeta.
+
+Lo desplegado queda en `~/HurgoTrack/backend/RELEASE`. Si moviste la etiqueta
+`vH0.1.0`, el paquete del core cambia y Docker lo reinstala.
+
+Primera vez en un servidor nuevo:
+
+```bash
+git clone https://github.com/hurgo-hub/HurgoTrack-Backend.git ~/HurgoTrack/backend
+git clone git@github-enginedj:Dev-lopp/EngineDj.git ~/HurgoTrack/enginedj
+cd ~/HurgoTrack/backend && ./deploy/init-env.sh api.midominio.com https://app.midominio.com
+./deploy/update.sh
+docker compose exec web python manage.py createsuperuser
+```
 
 Guarda copia segura de `FIELD_ENCRYPTION_KEY` y `POSTGRES_PASSWORD` del `.env`
 del VPS: sin la clave de cifrado no se leen las credenciales GPS guardadas.
@@ -86,10 +94,11 @@ del VPS: sin la clave de cifrado no se leen las credenciales GPS guardadas.
 Cambiar el dominio: en el `.env` del VPS edita `API_DOMAIN`, `ALLOWED_HOSTS` y
 `CSRF_TRUSTED_ORIGINS`, y corre `docker compose up -d` en `~/HurgoTrack/backend`.
 
-Volver al release anterior (en el VPS):
+Volver a una versión anterior (en el VPS):
 
 ```bash
-cd ~/HurgoTrack && mv backend backend.bad && mv backend.prev backend && cd backend && docker compose up -d --build
+cd ~/HurgoTrack/backend && git log --oneline -5
+git checkout <commit> && docker compose up -d --build   # luego: git checkout main
 ```
 
 ### Operación

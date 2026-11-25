@@ -12,3 +12,5 @@ dist/
 *.egg-info/
 # Core (EngineDj) armado por deploy/deploy.sh: no se versiona aquí
 vendor/
+# Qué está desplegado (lo escribe deploy/update.sh en el VPS)
+RELEASE

@@ -26,7 +26,7 @@ def build_trip(context, params, execution):
     """Paso 3: despacho arma el viaje con líneas de pedido confirmadas."""
     user = context_user(context)
     data = validate_input(Sz_trip_build_in, context)
-    trip = S_trip().build(user, company_id=data["company_id"], origin_address_id=data["origin_address_id"],
+    trip = S_trip().build(user, company_id=data["company_id"], origin_address_id=data.get("origin_address_id"),
                           allocations=data["allocations"], planned_departure=data.get("planned_departure"),
                           notes=data.get("notes", ""))
     return trip_detail(user, trip.pk)

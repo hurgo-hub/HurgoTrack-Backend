@@ -98,6 +98,13 @@ class S_trip_line(BaseService[E_trip_line]):
         stop.delivery_date = timezone.now()
         self.repository.save_stop(stop, user)
         R_trip_line_serie().mark(stop, "returned", exclude_returned=False)
+        from apps.stock.services import S_stock
+
+        s_stock = S_stock()
+        for allocation in R_order_line_trip().model.objects.filter(trip_line_id=stop).select_related(
+                "order_line_id__item_id__type_item_id", "order_line_id__order_id"):
+            s_stock.give_back_allocation(allocation, "return_in", user,
+                                         description=f"Devolución viaje {trip.code} parada {stop.sequence}")
         event = self.s_trip.events.register(trip, user, f"Devolución parada {stop.sequence}", line=stop,
                                             from_state=old_state, to_state="returned", description=reason,
                                             latitude=latitude, longitude=longitude)

@@ -108,8 +108,8 @@ class OrderFlowTests(APITestCase):
     def test_only_dispatch_confirms_and_odoo_is_required(self):
         order = self.ok(self.create())
         self.assertIn("Permisos faltantes", self.confirm(order["id"], user=self.commercial).reason)
-        for odoo in ("", "   "):
-            self.assertIn("odoo_purchase", self.confirm(order["id"], odoo=odoo).reason)
+        for odoo in ("", "   "):  # sin stock (motos): la compra de Odoo sigue siendo obligatoria
+            self.assertIn("referencia de la compra en Odoo", self.confirm(order["id"], odoo=odoo).reason)
         self.assertEqual(M_order.objects.get(pk=order["id"]).state, "requested")
 
     def test_cancel_rules(self):

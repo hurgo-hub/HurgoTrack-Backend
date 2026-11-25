@@ -7,6 +7,8 @@ from apps.orders.models import M_item, M_order, M_order_event, M_order_line
 
 
 def _address(address):
+    if address is None:
+        return None
     return {"id": address.id, "name": address.name, "address": address.address, "location": address.location_id.name}
 
 
@@ -105,11 +107,15 @@ class Sz_pending_order_line(serializers.ModelSerializer):
     item = serializers.CharField(source="item_id.name", read_only=True)
     brand = serializers.CharField(source="item_id.brand_id.name", default=None, read_only=True)
     qty_pending = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    loading_address_id = serializers.IntegerField(source="order_id.address_id_id", read_only=True, allow_null=True)
+    loading_address = serializers.CharField(source="order_id.address_id.name", default=None, read_only=True)
+    uses_stock = serializers.BooleanField(source="item_id.type_item_id.uses_stock", read_only=True)
 
     class Meta:
         model = M_order_line
         fields = ["id", "order_id", "order_code", "company_id", "recipient", "address", "item_id", "item", "brand",
-                  "qty", "qty_assigned", "qty_delivered", "qty_pending", "state"]
+                  "qty", "qty_assigned", "qty_delivered", "qty_pending", "state", "loading_address_id",
+                  "loading_address", "uses_stock"]
 
 
 # ----------------------------------------------------------------------
@@ -124,7 +130,8 @@ class Sz_order_line_in(serializers.Serializer):
 
 class Sz_order_in(serializers.Serializer):
     company_id = serializers.IntegerField(required=False, allow_null=True)
-    address_id = serializers.IntegerField(help_text="Dirección de cargue de la empresa.")
+    address_id = serializers.IntegerField(required=False, allow_null=True,
+                                          help_text="Lugar de cargue (opcional: lo puede elegir Hurgo después).")
     order_date = serializers.DateField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
     lines = Sz_order_line_in(many=True, allow_empty=False)
@@ -140,7 +147,13 @@ class Sz_order_id_in(serializers.Serializer):
 
 
 class Sz_confirm_in(Sz_order_id_in):
-    odoo_purchase = serializers.CharField(max_length=60)
+    odoo_purchase = serializers.CharField(max_length=60, required=False, allow_blank=True, default="",
+                                          help_text="Obligatoria salvo pedidos de productos con stock (materiales).")
+    loading_address_id = serializers.IntegerField(required=False, allow_null=True)
+
+
+class Sz_loading_point_in(Sz_order_id_in):
+    address_id = serializers.IntegerField(help_text="Lugar de cargue registrado (locations.loading_points).")
 
 
 class Sz_cancel_in(Sz_order_id_in):

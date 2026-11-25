@@ -7,7 +7,7 @@ class M_order(M_model_base, models.Model):
     """``order_dtd`` del .mwb: pedido de una empresa cliente.
 
     El destino (destinatario + dirección) va en cada línea, como en
-    ``order_dtd_line``; la cabecera lleva la dirección de cargue.
+    ``order_dtd_line``; la cabecera lleva el lugar de cargue (uno por viaje).
     """
 
     model_name = "order"
@@ -26,9 +26,10 @@ class M_order(M_model_base, models.Model):
     company_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="order_company_id", db_column="company_id",
                                    help_text="Empresa cliente que pide.")
-    address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=False, blank=False,
+    address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=True, blank=True,
                                    related_name="order_address_id", db_column="address_id",
-                                   help_text="Dirección de cargue de la empresa cliente.")
+                                   help_text="Lugar de cargue. Lo puede indicar el cliente o elegirlo Hurgo "
+                                             "al gestionar el pedido (orders.set_loading_point).")
     order_date = models.DateField(null=False, blank=False, help_text="date del .mwb.")
     state = models.CharField(max_length=15, null=False, blank=False, choices=state_choices, default="requested",
                              db_index=True)
@@ -50,4 +51,5 @@ class M_order(M_model_base, models.Model):
             ("cancel_order", "Puede cancelar pedidos antes de confirmar"),
             ("cancel_confirmed_order", "Puede cancelar pedidos confirmados"),
             ("view_all_order", "Puede ver pedidos de todas las empresas"),
+            ("set_loading_point_order", "Puede elegir el lugar de cargue de un pedido"),
         ]

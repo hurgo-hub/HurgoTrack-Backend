@@ -22,6 +22,7 @@ from enginedj.base.services.permissions import has_perm, require_perm, user_comp
 from apps.locations.repository import R_address
 from apps.orders.repository import R_order_line, R_order_line_trip
 from apps.orders.services import S_order_line
+from apps.stock.services import S_stock
 from apps.trips.entity import E_trip
 from apps.trips.repository import R_trip, R_trip_line, R_trip_line_serie
 from apps.trips.services.S_trip_event import S_trip_event
@@ -72,17 +73,25 @@ class S_trip(BaseService[E_trip]):
     # 3. Armar el viaje
     # ------------------------------------------------------------------
     @transaction.atomic
-    def build(self, user, *, company_id, origin_address_id, allocations, planned_departure=None, notes=""):
-        """Crea el viaje con las líneas de pedido: [{"order_line_id", "qty"}]. Una parada por destino."""
+    def build(self, user, *, company_id, allocations, origin_address_id=None, planned_departure=None, notes=""):
+        """Crea el viaje con las líneas de pedido: [{"order_line_id", "qty"}]. Una parada por destino.
+
+        Un solo lugar de cargue por viaje: ``origin_address_id`` o, si no se envía, el lugar de
+        cargue que Hurgo eligió en los pedidos (debe ser el mismo para todos).
+        """
         require_perm(user, "trips.build_trip", "Solo el equipo de despacho puede armar viajes.")
         if not allocations:
             raise BusinessError("El viaje debe llevar al menos una línea de pedido.")
         company = R_company().get_active(company_id)
         if company is None:
             raise BusinessNotFound("La empresa no existe.")
+        if origin_address_id is None:
+            origin_address_id = self._loading_point_of(allocations)
         origin = R_address().get_active(origin_address_id)
         if origin is None:
             raise BusinessNotFound("La dirección de origen no existe.")
+        if not origin.is_loading_point and origin.company_id_id != company.pk:
+            raise BusinessError(f"'{origin.name}' no es un lugar de cargue registrado.", code="not_loading_point")
 
         trip = self.repository.create_trip(company_id=company, origin_address_id=origin,
                                            planned_departure=planned_departure, notes=notes or "",
@@ -99,6 +108,19 @@ class S_trip(BaseService[E_trip]):
             raise BusinessError("Indica al menos una línea de pedido.")
         self._allocate(trip, user, allocations)
         return trip
+
+    @staticmethod
+    def _loading_point_of(allocations):
+        ids = {int(a["order_line_id"]) for a in allocations}
+        points = {line.order_id.address_id_id for line in R_order_line().with_order_and_item(ids)}
+        points.discard(None)
+        if not points:
+            raise BusinessError("Indica el lugar de cargue del viaje (los pedidos aún no lo tienen).",
+                                code="loading_point_required")
+        if len(points) > 1:
+            raise BusinessError("Los pedidos cargan en lugares distintos: arma un viaje por lugar de cargue.",
+                                code="mixed_loading_point")
+        return points.pop()
 
     def _allocate(self, trip, user, allocations):
         self.require_state(trip, ("draft",), "agregar pedidos (solo mientras se arma)")
@@ -131,6 +153,9 @@ class S_trip(BaseService[E_trip]):
                                     f"{line.qty_pending} por asignar.", code="qty_exceeded")
             if line.item_id.is_serialized and qty != qty.to_integral_value():
                 raise BusinessError(f"{line.item_id} se despacha por unidades enteras.")
+            if order.address_id_id and order.address_id_id != trip.origin_address_id_id:
+                raise BusinessError(f"El pedido {order.code} carga en '{order.address_id}'; un viaje tiene un solo "
+                                    "lugar de cargue.", code="mixed_loading_point")
 
         self._check_single_brand(trip, user, [line.item_id for line in order_lines])
 
@@ -145,7 +170,11 @@ class S_trip(BaseService[E_trip]):
                                                address_id_id=key[1], create_user=user)
                 stops[key] = stop
                 next_sequence += 1
-            self.r_allocation.add_qty(line, stop, qty, user)
+            allocation = self.r_allocation.add_qty(line, stop, qty, user)
+            if line.item_id.type_item_id.uses_stock:
+                # Materiales: se cargan desde el stock de la empresa (compras de Odoo)
+                S_stock().take(line.order_id.company_id_id, line.item_id, qty, user, allocation=allocation,
+                               description=f"Viaje {trip.code} · pedido {line.order_id.code}")
             stop.qty += qty
             stop.weight_kg += qty * (line.item_id.weight_kg or 0)
             self.r_line.save_stop(stop, user)
@@ -212,6 +241,10 @@ class S_trip(BaseService[E_trip]):
         if not (reason or "").strip():
             raise BusinessError("Indica el motivo de la cancelación.")
         self.set_state(trip, user, "cancelled", "Viaje cancelado", description=reason)
+        s_stock = S_stock()
+        for allocation in self.r_allocation.of_trip(trip).select_related(
+                "order_line_id__item_id__type_item_id", "order_line_id__order_id"):
+            s_stock.give_back_allocation(allocation, "trip_cancel_in", user, description=f"Viaje {trip.code} cancelado")
         S_order_line().refresh(self.r_allocation.order_line_ids_of_trip(trip), user)
         return trip
 

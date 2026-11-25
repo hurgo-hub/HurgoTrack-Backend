@@ -4,7 +4,11 @@ from enginedj.base.models import M_model_base
 
 
 class M_address(M_model_base, models.Model):
-    """Dirección de una empresa: bodega de cargue o punto de entrega."""
+    """Dirección de una empresa: bodega de cargue o punto de entrega.
+
+    ``is_loading_point``: lugar donde Hurgo carga (planta, bodega, proveedor). Lo registra
+    despacho para cualquier empresa y se elige al gestionar el pedido. ``tags`` dice qué se carga ahí.
+    """
 
     model_name = "address"
 
@@ -18,6 +22,10 @@ class M_address(M_model_base, models.Model):
     description = models.TextField(null=False, blank=True, default="", help_text="Indicaciones para llegar.")
     contact_name = models.CharField(max_length=150, null=False, blank=True, default="")
     contact_phone = models.CharField(max_length=40, null=False, blank=True, default="")
+    is_loading_point = models.BooleanField(default=False, db_index=True,
+                                           help_text="Lugar de cargue que Hurgo puede elegir al gestionar pedidos.")
+    tags = models.ManyToManyField("locations.M_loading_tag", blank=True, related_name="address_tags",
+                                  db_table="address_loading_tag", help_text="Qué se carga en este lugar.")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
@@ -27,3 +35,6 @@ class M_address(M_model_base, models.Model):
     class Meta:
         db_table = "address"
         ordering = ["name"]
+        permissions = [
+            ("manage_loading_point", "Puede registrar lugares de cargue y sus etiquetas"),
+        ]

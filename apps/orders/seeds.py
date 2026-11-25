@@ -6,7 +6,7 @@ ROLES = {
         "orders.view_m_*",
         "orders.add_m_order", "orders.change_m_order", "orders.submit_order", "orders.cancel_order",
         "orders.confirm_order", "orders.cancel_confirmed_order", "orders.view_all_order",
-        "orders.create_any_company_order",
+        "orders.create_any_company_order", "orders.set_loading_point_order",
     ],
     "comercial": [
         "orders.view_m_order", "orders.add_m_order", "orders.change_m_order", "orders.submit_order",
@@ -27,4 +27,5 @@ WORKFLOWS = {
     "orders.list": ["orders.view_m_order"],
     "orders.items": ["orders.add_m_order"],
     "orders.pending_lines": ["trips.build_trip"],
+    "orders.set_loading_point": ["orders.set_loading_point_order"],
 }

@@ -9,9 +9,11 @@ class E_type_item(E_model_base):
         self,
         name: Optional[str] = None,
         is_serialized: Optional[bool] = False,
+        uses_stock: Optional[bool] = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
         self.name = name
         self.is_serialized = is_serialized
+        self.uses_stock = uses_stock
