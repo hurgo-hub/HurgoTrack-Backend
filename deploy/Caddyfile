@@ -1,0 +1,37 @@
+# Proxy de Hurgo Track. Con API_DOMAIN apuntando al VPS, Caddy saca y renueva solo
+# el certificado de Let's Encrypt (las cookies de sesión exigen HTTPS).
+
+(hurgotrack) {
+	encode zstd gzip
+
+	# Estáticos del admin y de DRF (collectstatic).
+	handle_path /static/* {
+		root * /srv/static
+		file_server
+	}
+
+	# Archivos subidos (remisiones, SOAT, documentos): solo con sesión iniciada.
+	# Caddy le pregunta al backend con las mismas cookies antes de entregar el archivo.
+	handle_path /media/* {
+		forward_auth web:8000 {
+			uri /api/auth/session/status/
+		}
+		root * /srv/media
+		file_server
+	}
+
+	# API, admin y WebSockets (/ws/notifications/).
+	handle {
+		reverse_proxy web:8000
+	}
+}
+
+{$API_DOMAIN:localhost} {
+	import hurgotrack
+}
+
+# Por IP y sin HTTPS, solo para revisar que el servidor responde mientras el DNS
+# no apunta al VPS. El login por cookies no funciona aquí (exige HTTPS).
+:80 {
+	import hurgotrack
+}

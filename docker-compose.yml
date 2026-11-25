@@ -1,0 +1,141 @@
+# Producción de Hurgo Track en el VPS.
+#
+# Se despliega desde tu PC con ./deploy/deploy.sh (sube el código y el core, y
+# corre build + up en el VPS). En el VPS, el .env de esta carpeta es el de
+# producción: lo crea deploy/init-env.sh, no se sube a git ni entra a la imagen.
+#
+# Servicios: caddy (HTTPS) -> web (daphne: API + WebSockets) ; worker y beat (Celery) ;
+# db (PostgreSQL) y redis. Solo caddy publica puertos (80 y 443).
+
+name: hurgotrack
+
+# Respaldos: el bucket, sus llaves y las claves de cifrado van en .env.backup
+# (lo crea deploy/backup/configure-backup.sh). Solo lo leen db, restic y
+# restore-test; la API, el worker y el beat no ven esas llaves.
+
+x-backend: &backend
+  image: hurgotrack-backend:latest
+  build:
+    context: .
+  env_file: .env
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  volumes:
+    - media:/app/media
+    - static:/app/staticfiles
+
+services:
+  web:
+    <<: *backend
+    environment:
+      RUN_MIGRATIONS: "1"
+
+  worker:
+    <<: *backend
+    command: ["celery", "-A", "config", "worker", "-l", "info"]
+
+  beat:
+    <<: *backend
+    command: ["celery", "-A", "config", "beat", "-l", "info"]
+
+  db:
+    image: hurgotrack-postgres:17
+    build:
+      context: ./deploy/postgres
+    restart: unless-stopped
+    # WAL continuo hacia el bucket (pgBackRest): permite restaurar a cualquier
+    # minuto. archive_timeout obliga a subir un segmento al menos cada 60 s.
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=/usr/local/bin/archive-push %p
+      - -c
+      - archive_timeout=60
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hurgotrack}
+      POSTGRES_USER: ${POSTGRES_USER:-hurgotrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+    # Sin .env.backup arranca igual, pero sin archivar el WAL.
+    env_file:
+      - path: .env.backup
+        required: false
+    shm_size: 256mb
+    volumes:
+      - pgdata17:/var/lib/postgresql/data
+      - pgbackrest_spool:/var/spool/pgbackrest
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1000"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # Solo el dominio: Caddy no necesita las demás claves.
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-localhost}
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - static:/srv/static:ro
+      - media:/srv/media:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # --- Solo para deploy/backup/backup.sh (no arrancan con "up") -------------
+  restic:
+    image: restic/restic:0.18.0
+    profiles: ["backup"]
+    hostname: hurgotrack
+    env_file: .env.backup
+    volumes:
+      - media:/data/media:ro
+      - restic_cache:/root/.cache/restic
+
+  restore-test:
+    image: hurgotrack-postgres:17
+    profiles: ["backup"]
+    entrypoint: ["sh", "/usr/local/bin/restore-test"]
+    env_file: .env.backup
+    volumes:
+      - restore_test:/var/lib/postgresql/data
+
+volumes:
+  # pgdata: base vieja (imagen Alpine). Ya no se usa; se conserva para volver
+  # atrás. Borrarla cuando los respaldos estén probados.
+  pgdata:
+  pgdata17:
+  pgbackrest_spool:
+  redisdata:
+  media:
+  static:
+  caddy_data:
+  caddy_config:
+  restic_cache:
+  restore_test:
