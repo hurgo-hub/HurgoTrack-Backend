@@ -37,23 +37,124 @@ EngineDj, que vive fuera de este repo: `pip install --no-deps -e /ruta/a/EngineD
 Requiere PostgreSQL 14 o superior. Si prefieres SQLite para una prueba
 rápida, cambia `DATABASE_URL=sqlite:///db.sqlite3` en `.env`.
 
-## Producción
+## Producción (VPS con Docker Compose)
+
+Todo corre en contenedores (`docker-compose.yml`): **caddy** (HTTPS automático con
+Let's Encrypt) → **web** (daphne: API, admin y WebSockets) y **worker** / **beat**
+(Celery), con **db** (PostgreSQL 17) y **redis**. Solo caddy publica los puertos 80
+y 443. Settings: `config.settings.production` (cookies `Secure` + `SameSite=None`,
+Redis para caché, WebSockets y Celery).
+
+- `/static/` lo sirve Caddy (collectstatic).
+- `/media/` (remisiones, SOAT, documentos) solo se entrega con sesión iniciada:
+  Caddy pregunta a `/api/auth/session/status/` con las mismas cookies.
+- Al arrancar, `web` corre `migrate`, `collectstatic` y `seed_workflows`.
+
+### Despliegue desde tu PC
+
+El VPS no necesita acceso a GitHub: `deploy/deploy.sh` (en WSL) arma el core
+desde la etiqueta `vH0.1.0` de tu carpeta `EngineDj`, empaqueta este backend tal
+como está en tu carpeta (sin `.env`, `.venv` ni `media`) y lo sube por SSH a
+`~/HurgoTrack/backend`. Allí conserva el `.env` del servidor, deja el release
+anterior en `~/HurgoTrack/backend.prev` y corre `docker compose build` + `up`.
+
+Usa el `ssh.exe` de Windows con la llave cargada en el ssh-agent:
+
+```powershell
+ssh-add C:\Users\TUF\.ssh\id_contabo
+```
+
+Primera vez (crea el `.env` del VPS con claves nuevas):
 
 ```bash
-# WSGI
-DJANGO_SETTINGS_MODULE=config.settings.production \
-gunicorn enginedj.wsgi:application
+API_DOMAIN=api.midominio.com FRONTEND_ORIGIN=https://app.midominio.com ./deploy/deploy.sh
+docker compose exec web python manage.py createsuperuser   # en el VPS
+```
 
-# ASGI / WebSockets
-DJANGO_SETTINGS_MODULE=config.settings.production \
-daphne enginedj.asgi:application
+Cada despliegue:
 
-# Celery
-DJANGO_SETTINGS_MODULE=config.settings.production \
-celery -A config worker -l info
+```bash
+./deploy/deploy.sh
+```
 
-DJANGO_SETTINGS_MODULE=config.settings.production \
-celery -A config beat -l info
+Si moviste la etiqueta `vH0.1.0`, el paquete del core cambia y Docker lo
+reinstala. Lo que quedó desplegado está en `~/HurgoTrack/backend/RELEASE`.
+
+Guarda copia segura de `FIELD_ENCRYPTION_KEY` y `POSTGRES_PASSWORD` del `.env`
+del VPS: sin la clave de cifrado no se leen las credenciales GPS guardadas.
+
+Cambiar el dominio: en el `.env` del VPS edita `API_DOMAIN`, `ALLOWED_HOSTS` y
+`CSRF_TRUSTED_ORIGINS`, y corre `docker compose up -d` en `~/HurgoTrack/backend`.
+
+Volver al release anterior (en el VPS):
+
+```bash
+cd ~/HurgoTrack && mv backend backend.bad && mv backend.prev backend && cd backend && docker compose up -d --build
+```
+
+### Operación
+
+```bash
+docker compose ps                       # estado
+docker compose logs -f web              # logs (web, worker, beat, caddy)
+docker compose exec web python manage.py shell
+docker compose exec db pg_dump -U hurgotrack hurgotrack > respaldo.sql
+```
+
+Pendiente cuando el HTTPS esté funcionando: activar HSTS (`SECURE_HSTS_SECONDS`).
+
+### Respaldos (`deploy/backup/`, `deploy/postgres/`)
+
+Regla 3-2-1: snapshot diario de Contabo (`~/contabo-snapshot.sh`, 03:00) +
+bucket S3 compatible con Object Lock (Backblaze B2 o Cloudflare R2), cifrado.
+
+| Qué | Cómo | Cuándo (UTC) |
+| --- | --- | --- |
+| PostgreSQL | pgBackRest: completo los domingos, diferencial lunes a sábado, cifrado AES-256 | 02:15 |
+| WAL | `archive_command` de `db`, al menos cada 60 s: restaurar a cualquier minuto | continuo |
+| Archivos subidos (`media`) | restic, cifrado; guarda 35 días + 1 por mes durante 12 meses | 02:45 |
+| Revisión de los repositorios | `pgbackrest check` + `restic check` | domingos 04:30 |
+| Prueba de restauración | restaura el último respaldo en un contenedor aparte y revisa la base | día 1, 05:30 |
+
+La imagen de `db` (`deploy/postgres/`) es `postgres:17-bookworm` con pgBackRest
+(y pgaudit, sin activar). El bucket, sus llaves y las claves de cifrado van en
+`.env.backup`, que solo leen `db`, `restic` y `restore-test`; la API no los ve.
+
+Configurar (en el VPS, una vez):
+
+1. Crear el bucket con **Object Lock** y una llave de aplicación que solo tenga
+   acceso a ese bucket. El bloqueo debe durar **menos** que la retención (por
+   ejemplo 30 días, frente a ~35 de pgBackRest y restic); si no, la limpieza
+   falla. En B2 agrega además la regla de ciclo de vida que borra las versiones
+   ocultas, o el espacio no se libera.
+2. Escribir los datos del bucket (la llave secreta no se ve en pantalla):
+   ```bash
+   cd ~/HurgoTrack/backend && ./deploy/backup/configure-backup.sh
+   docker compose up -d db
+   ./deploy/backup/backup.sh init && ./deploy/backup/backup.sh full
+   ./deploy/backup/backup.sh media && ./deploy/backup/backup.sh restore-test
+   ./deploy/backup/install-cron.sh
+   ```
+3. Guardar `PGBACKREST_REPO1_CIPHER_PASS` y `RESTIC_PASSWORD` de `.env.backup`
+   fuera del VPS. Sin ellas los respaldos no se pueden leer.
+
+Estado: `~/HurgoTrack/backup-status` (última ejecución correcta de cada tarea) y
+`~/HurgoTrack/backups.log`. Ver lo guardado: `./deploy/backup/backup.sh info`.
+
+Restaurar a un minuto (en un contenedor aparte, sin tocar `db`):
+
+```bash
+docker compose --profile backup run --rm --entrypoint sh restore-test -c \
+  'chown postgres /var/lib/postgresql/data && gosu postgres pgbackrest --stanza=hurgotrack \
+   --archive-mode=off --type=time --target="2026-11-25 14:30:00+00" restore'
+```
+
+Sin Docker (comandos de los entrypoints del motor):
+
+```bash
+DJANGO_SETTINGS_MODULE=config.settings.production daphne enginedj.asgi:application
+DJANGO_SETTINGS_MODULE=config.settings.production celery -A config worker -l info
+DJANGO_SETTINGS_MODULE=config.settings.production celery -A config beat -l info
 ```
 
 ## Apps propias
