@@ -6,6 +6,7 @@ from enginedj.base.steps.helpers import context_user, results, validate_input
 from apps.orders.serializers import (
     Sz_cancel_in,
     Sz_confirm_in,
+    Sz_loading_point_in,
     Sz_order_detail,
     Sz_order_id_in,
     Sz_order_in,
@@ -24,7 +25,7 @@ def create_order(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_order_in, context)
     order = S_order().create(
-        user, company_id=data.get("company_id"), address_id=data["address_id"], lines=data["lines"],
+        user, company_id=data.get("company_id"), address_id=data.get("address_id"), lines=data["lines"],
         order_date=data.get("order_date"), notes=data.get("notes", ""), submit=data.get("submit", True),
     )
     return _detail(user, order.pk)
@@ -35,7 +36,7 @@ def update_order(context, params, execution):
     """Reemplaza dirección de cargue y productos mientras no esté confirmado."""
     user = context_user(context)
     data = validate_input(Sz_order_update_in, context)
-    S_order().update(user, data["order_id"], address_id=data["address_id"], lines=data["lines"],
+    S_order().update(user, data["order_id"], address_id=data.get("address_id"), lines=data["lines"],
                      order_date=data.get("order_date"), notes=data.get("notes", ""))
     return _detail(user, data["order_id"])
 
@@ -53,7 +54,8 @@ def confirm_order(context, params, execution):
     """Paso 2: despacho confirma la compra en Odoo."""
     user = context_user(context)
     data = validate_input(Sz_confirm_in, context)
-    S_order().confirm(user, data["order_id"], odoo_purchase=data["odoo_purchase"])
+    S_order().confirm(user, data["order_id"], odoo_purchase=data["odoo_purchase"],
+                      loading_address_id=data.get("loading_address_id"))
     return _detail(user, data["order_id"])
 
 
@@ -77,3 +79,12 @@ def retrieve_order(context, params, execution):
 def list_orders(context, params, execution):
     """Igual que list.relations (data: fields, relations, filters...), limitado a las empresas del usuario."""
     return results(S_order().list_scoped(context_user(context), context.get("data") or {}))
+
+
+@register_module("orders.set_loading_point", important=True)
+def set_loading_point(context, params, execution):
+    """Hurgo elige el lugar de cargue del pedido (uno por viaje)."""
+    user = context_user(context)
+    data = validate_input(Sz_loading_point_in, context)
+    S_order().set_loading_point(user, data["order_id"], data["address_id"])
+    return _detail(user, data["order_id"])

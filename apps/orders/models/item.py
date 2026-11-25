@@ -31,6 +31,13 @@ class M_item(M_model_base, models.Model):
     weight_kg = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True, help_text="Peso unitario.")
     is_vehicle = models.BooleanField(default=False, help_text="El producto es un vehículo (moto).")
     is_serialized = models.BooleanField(default=False, help_text="is_serie del .mwb: se despacha por VIN.")
+    loading_tags = models.ManyToManyField("locations.M_loading_tag", blank=True, related_name="item_loading_tags",
+                                          db_table="item_loading_tag",
+                                          help_text="Etiquetas para sugerir dónde se carga el producto.")
+
+    @property
+    def uses_stock(self) -> bool:
+        return self.type_item_id.uses_stock
 
     def __str__(self):
         return self.name

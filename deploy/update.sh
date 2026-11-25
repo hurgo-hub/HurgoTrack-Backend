@@ -33,7 +33,10 @@ if [ -d "$ENGINEDJ_DIR/.git" ]; then
     mkdir -p "$W/src" "$W/out"
     git -C "$ENGINEDJ_DIR" archive "$TAG" | tar -x -C "$W/src"
     # El paquete se arma en un contenedor: el servidor no necesita pip.
-    docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+    # SOURCE_DATE_EPOCH (fecha del commit) hace que la misma etiqueta dé siempre
+    # el mismo .whl, así Docker reutiliza la capa de dependencias si no cambió.
+    EPOCH="$(git -C "$ENGINEDJ_DIR" log -1 --format=%ct "${TAG}^{commit}")"
+    docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e SOURCE_DATE_EPOCH="$EPOCH" \
         -v "$W/src:/src" -v "$W/out:/out" python:3.14-slim \
         pip wheel --quiet --disable-pip-version-check --no-deps -w /out /src
     mkdir -p vendor

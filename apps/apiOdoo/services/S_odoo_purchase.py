@@ -15,8 +15,9 @@ class S_odoo_purchase(BaseService[E_odoo_purchase]):
         super().__init__(repository=R_odoo_purchase(), entity_class=E_odoo_purchase)
         self.repository: R_odoo_purchase = self.repository
 
-    def sync_by_name(self, name: str, user=None):
-        """Trae la compra de Odoo, actualiza la copia local y la devuelve."""
+    def sync_by_name(self, name: str, user=None, with_lines: bool = False):
+        """Trae la compra de Odoo, actualiza la copia local y la devuelve. ``with_lines`` trae también sus
+        líneas (producto + cantidad comprada), que usa la app stock."""
         name = (name or "").strip()
         log = S_odoo_sync_log()
         try:
@@ -27,7 +28,24 @@ class S_odoo_purchase(BaseService[E_odoo_purchase]):
         log.success("get_purchase", data, odoo_model="purchase.order", reference=name, user=user)
         if data is None:
             raise BusinessError(f"La compra {name} no existe en Odoo.", code="odoo_purchase_not_found")
-        return self.repository.upsert_from_odoo(data, user)
+        purchase = self.repository.upsert_from_odoo(data, user)
+        if with_lines:
+            try:
+                lines = ApiOdooService().get_purchase_lines(purchase.odoo_id)
+            except Exception as exc:
+                log.error("get_purchase_lines", exc, odoo_model="purchase.order.line", reference=name, user=user)
+                raise
+            log.success("get_purchase_lines", lines, odoo_model="purchase.order.line", reference=name, user=user)
+            self.repository.upsert_lines_from_odoo(purchase, lines, user)
+        return purchase
+
+    def require_confirmed(self, purchase):
+        if purchase.state not in settings.ODOO_CONFIRMED_PURCHASE_STATES:
+            raise BusinessError(
+                f"La compra {purchase.name} está en estado '{purchase.state}' en Odoo; debe estar confirmada.",
+                code="odoo_purchase_not_confirmed",
+            )
+        return purchase
 
     def validate_for_order(self, name: str, order, user=None):
         """Paso 2: la compra debe existir en Odoo y estar confirmada para confirmar el pedido."""

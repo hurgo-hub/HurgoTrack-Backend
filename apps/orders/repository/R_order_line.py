@@ -24,7 +24,9 @@ class R_order_line(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line]):
 
     def with_order_and_item(self, line_ids) -> list[M_order_line]:
         return list(
-            self.model.objects.filter(pk__in=line_ids).select_related("order_id", "item_id").order_by("pk")
+            self.model.objects.filter(pk__in=line_ids)
+            .select_related("order_id__address_id", "item_id__type_item_id")
+            .order_by("pk")
         )
 
     def replace_lines(self, order, rows: list[M_order_line]):
@@ -32,6 +34,11 @@ class R_order_line(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line]):
         self.model.objects.filter(order_id=order).delete()
         self.model.objects.bulk_create(rows)
         self._invalidate_list_cache()
+
+    def all_use_stock(self, order) -> bool:
+        """Todas las líneas activas son de productos que se cargan desde el stock (materiales)."""
+        lines = self.model.objects.filter(order_id=order, is_active=True).exclude(state="cancelled")
+        return lines.exists() and not lines.filter(item_id__type_item_id__uses_stock=False).exists()
 
     def has_quantities_in_trips(self, order) -> bool:
         lines = self.model.objects.filter(order_id=order)
@@ -92,7 +99,8 @@ class R_order_line(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line]):
                 order_id__state__in=["confirmed", "in_progress"],
                 state__in=["pending", "partial"],
             )
-            .select_related("order_id", "recipient_id", "address_id", "item_id__brand_id")
+            .select_related("order_id__address_id", "recipient_id", "address_id", "item_id__brand_id",
+                            "item_id__type_item_id")
             .order_by("order_id__order_date", "order_id", "id")
         )
         if company_id:

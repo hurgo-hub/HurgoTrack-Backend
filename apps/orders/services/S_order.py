@@ -97,11 +97,16 @@ class S_order(BaseService[E_order]):
         return company
 
     def _resolve_origin(self, company, address_id):
+        """Lugar de cargue: opcional (Hurgo lo puede elegir después). Vale una dirección de la empresa
+        del pedido o un lugar de cargue registrado por Hurgo (planta, bodega, proveedor)."""
+        if address_id is None:
+            return None
         address = self.r_address.get_active(address_id)
         if address is None:
             raise BusinessNotFound("La dirección de cargue no existe.")
-        if address.company_id_id != company.pk:
-            raise BusinessError("La dirección de cargue no pertenece a la empresa del pedido.", code="address_mismatch")
+        if address.company_id_id != company.pk and not address.is_loading_point:
+            raise BusinessError("La dirección de cargue no pertenece a la empresa del pedido ni es un lugar de "
+                                "cargue registrado.", code="address_mismatch")
         return address
 
     def _build_lines(self, order, user, lines) -> list[M_order_line]:
@@ -140,7 +145,7 @@ class S_order(BaseService[E_order]):
     # 1. Pedido
     # ------------------------------------------------------------------
     @transaction.atomic
-    def create(self, user, *, address_id, lines, company_id=None, order_date=None, notes="", submit=True):
+    def create(self, user, *, lines, address_id=None, company_id=None, order_date=None, notes="", submit=True):
         require_perm(user, "orders.add_m_order", "No tienes permiso para crear pedidos.")
         company = self._resolve_company(user, company_id)
         origin = self._resolve_origin(company, address_id)
@@ -155,7 +160,7 @@ class S_order(BaseService[E_order]):
         return order
 
     @transaction.atomic
-    def update(self, user, order_id, *, address_id, lines, order_date=None, notes=""):
+    def update(self, user, order_id, *, lines, address_id=None, order_date=None, notes=""):
         """Reemplaza dirección de cargue y productos mientras Hurgo no lo haya confirmado."""
         order = self._lock(order_id)
         self._require_manage(user, order)
@@ -181,14 +186,26 @@ class S_order(BaseService[E_order]):
     # 2. Confirmación
     # ------------------------------------------------------------------
     @transaction.atomic
-    def confirm(self, user, order_id, *, odoo_purchase):
-        """Despacho confirma la compra en Odoo. Con ODOO_ENABLED se valida que exista y esté confirmada allá."""
+    def confirm(self, user, order_id, *, odoo_purchase="", loading_address_id=None):
+        """Despacho confirma el pedido.
+
+        - Productos con stock (materiales): no hace falta la compra; se compra con solicitudes de compra
+          (app stock) y se carga desde el stock de la empresa.
+        - El resto: referencia de la compra en Odoo. Con ODOO_ENABLED se valida que exista y esté confirmada.
+        ``loading_address_id`` elige de paso el lugar de cargue.
+        """
         require_perm(user, "orders.confirm_order", "Solo el equipo de despacho confirma pedidos.")
         order = self._lock(order_id)
         self._require_state(order, ("requested",), "confirmar")
+        if loading_address_id is not None:
+            self._apply_loading_point(order, user, loading_address_id)
         odoo_purchase = (odoo_purchase or "").strip()
         if not odoo_purchase:
-            raise BusinessError("Indica la referencia de la compra en Odoo.", code="odoo_required")
+            if not self.r_line.all_use_stock(order):
+                raise BusinessError("Indica la referencia de la compra en Odoo.", code="odoo_required")
+            self._set_state(order, user, "confirmed", "Pedido confirmado (se carga desde el stock)",
+                            confirmed_date=timezone.now())
+            return order
         if settings.ODOO_ENABLED:
             from apps.apiOdoo.services import S_odoo_purchase
 
@@ -196,6 +213,30 @@ class S_order(BaseService[E_order]):
         self._set_state(order, user, "confirmed", "Compra confirmada en Odoo", description=odoo_purchase,
                         odoo_purchase=odoo_purchase, confirmed_date=timezone.now())
         return order
+
+    # ------------------------------------------------------------------
+    # Lugar de cargue (lo elige Hurgo al gestionar el pedido)
+    # ------------------------------------------------------------------
+    @transaction.atomic
+    def set_loading_point(self, user, order_id, address_id):
+        require_perm(user, "orders.set_loading_point_order", "Solo el equipo de despacho elige el lugar de cargue.")
+        order = self._lock(order_id)
+        self._require_state(order, ("draft", "requested", "confirmed"), "cambiar el lugar de cargue")
+        self._apply_loading_point(order, user, address_id)
+        return order
+
+    def _apply_loading_point(self, order, user, address_id):
+        if self.r_line.has_quantities_in_trips(order):
+            raise BusinessError("El pedido ya tiene cantidades en viajes; el lugar de cargue no se puede cambiar.",
+                                code="order_in_trips")
+        address = self.r_address.get_active(address_id)
+        if address is None:
+            raise BusinessNotFound("El lugar de cargue no existe.")
+        if not address.is_loading_point and address.company_id_id != order.company_id_id:
+            raise BusinessError(f"'{address.name}' no es un lugar de cargue registrado.", code="not_loading_point")
+        order.address_id = address
+        self.repository.save_order(order, user)
+        self.r_event.register(order, user, "Lugar de cargue asignado", description=str(address))
 
     @transaction.atomic
     def cancel(self, user, order_id, reason):

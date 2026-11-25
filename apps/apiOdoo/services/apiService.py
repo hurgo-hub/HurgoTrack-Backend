@@ -5,6 +5,7 @@ from apps.apiOdoo.repository import ApiOdooRepository
 PURCHASE_FIELDS = ["id", "name", "state", "partner_id", "date_order", "amount_total", "order_line"]
 PARTNER_FIELDS = ["id", "name", "vat", "email", "phone", "is_company"]
 PRODUCT_FIELDS = ["id", "name", "default_code", "weight"]
+PURCHASE_LINE_FIELDS = ["id", "order_id", "product_id", "name", "product_qty", "qty_received", "product_uom"]
 
 
 class ApiOdooService:
@@ -16,6 +17,11 @@ class ApiOdooService:
         """Compra (purchase.order) por su referencia, ej. P00012."""
         result = self.repository.search_read("purchase.order", [["name", "=", name]], PURCHASE_FIELDS, limit=1)
         return result[0] if result else None
+
+    def get_purchase_lines(self, purchase_odoo_id: int) -> list[dict]:
+        """Líneas (purchase.order.line) de una compra: producto y cantidad comprada / recibida."""
+        return self.repository.search_read("purchase.order.line", [["order_id", "=", purchase_odoo_id]],
+                                           PURCHASE_LINE_FIELDS, order="id")
 
     def get_partners(self, domain: list | None = None, limit: int | None = None) -> list[dict]:
         """Contactos (res.partner). Por defecto solo empresas."""

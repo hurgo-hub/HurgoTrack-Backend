@@ -178,7 +178,8 @@ class Sz_allocation_in(serializers.Serializer):
 
 class Sz_trip_build_in(serializers.Serializer):
     company_id = serializers.IntegerField()
-    origin_address_id = serializers.IntegerField()
+    origin_address_id = serializers.IntegerField(required=False, allow_null=True,
+                                                 help_text="Lugar de cargue; vacío = el de los pedidos.")
     planned_departure = serializers.DateTimeField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
     allocations = Sz_allocation_in(many=True, allow_empty=False)

@@ -15,6 +15,7 @@ class E_address(E_model_base):
         description: Optional[str] = '',
         contact_name: Optional[str] = '',
         contact_phone: Optional[str] = '',
+        is_loading_point: Optional[bool] = False,
         latitude: Optional[Decimal] = None,
         longitude: Optional[Decimal] = None,
         **kwargs,
@@ -28,5 +29,6 @@ class E_address(E_model_base):
         self.description = description
         self.contact_name = contact_name
         self.contact_phone = contact_phone
+        self.is_loading_point = is_loading_point
         self.latitude = latitude
         self.longitude = longitude
