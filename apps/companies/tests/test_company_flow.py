@@ -135,3 +135,28 @@ class CompanyFlowTests(APITestCase):
         self.assertEqual(self.ok(run_workflow(admin, "stock.purchase_request.list")), [])
         lookups = self.ok(run_workflow(admin, "locations.lookups"))
         self.assertEqual([c["id"] for c in lookups["companies"]], [company["id"]])
+
+
+class IdentifyTests(APITestCase):
+    """Paso 1 del login: respuesta neutra (no revela si el usuario existe ni si está activo)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        build_world(cls)
+        cls.inactive = User.objects.create_user("inactivo", password="x-Clave-2026")
+        cls.inactive.is_active = False
+        cls.inactive.save()
+        M_user_company.objects.create(user_id=cls.inactive, company_id=cls.uma)
+
+    def identify(self, username):
+        response = client_for(None).post("/api/auth/identify/", {"username": username}, format="json")
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def test_known_user_of_one_company_gets_its_brand(self):
+        self.assertEqual(self.identify("COMERCIAL")["company"]["name"], "UMA")
+
+    def test_unknown_inactive_or_without_company_look_the_same(self):
+        expected = {"company": None}
+        for username in ("no-existe", "inactivo", "despacho"):
+            self.assertEqual(self.identify(username), expected, username)
