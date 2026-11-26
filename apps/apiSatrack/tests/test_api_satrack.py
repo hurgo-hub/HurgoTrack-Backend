@@ -99,9 +99,9 @@ class ApiSatrackTests(APITestCase):
         cls.trip = M_trip.objects.create(company_id=cls.uma, carrier_id=cls.hurgo, vehicle_id=cls.vehicle,
                                          driver_id=cls.driver, origin_address_id=cls.warehouse, state="in_route",
                                          departure_date=timezone.now() - timedelta(hours=1))
-        cls.stop1 = M_trip_line.objects.create(trip_id=cls.trip, sequence=1, recipient_id=cls.dealer,
+        cls.stop1 = M_trip_line.objects.create(trip_id=cls.trip, sequence=1, recipient_id=cls.uma,
                                                address_id=cls.dealer_addr, state="in_route")
-        cls.stop2 = M_trip_line.objects.create(trip_id=cls.trip, sequence=2, recipient_id=cls.dealer2,
+        cls.stop2 = M_trip_line.objects.create(trip_id=cls.trip, sequence=2, recipient_id=cls.uma,
                                                address_id=cls.dealer2_addr)  # sin coordenadas
 
     def setUp(self):
@@ -232,7 +232,7 @@ class ApiSatrackTests(APITestCase):
         self.assertEqual(arc["from"], [-73.2532, 10.4634])
         self.assertEqual(arc["to"], [-73.25, 10.477])
         self.assertEqual(arc["trip_code"], self.trip.code)
-        self.assertEqual(arc["destination"], "Concesionario 1 · Sede 1")
+        self.assertEqual(arc["destination"], "UMA · Concesionario 1")
         self.assertEqual([s["trip_line_id"] for s in data["stops"]], [self.stop1.id])
         self.assertEqual(data["missing_coordinates"][0]["trip_line_id"], self.stop2.id)
         (vehicle,) = data["vehicles"]

@@ -36,6 +36,7 @@ INSTALLED_APPS += [
     "apps.trips",
     "apps.apiOdoo",
     "apps.stock",
+    "apps.companies",
     "apps.apiSatrack",
 ]
 

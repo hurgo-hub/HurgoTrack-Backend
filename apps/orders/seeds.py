@@ -13,6 +13,13 @@ ROLES = {
         "orders.cancel_order", "orders.view_m_order_line", "orders.view_m_order_event",
         "orders.view_m_item", "orders.view_m_type_item", "orders.view_m_brand",
     ],
+    # Admin de empresa: lo del comercial + su catálogo de productos (solo su empresa)
+    "admin_empresa": [
+        "orders.view_m_order", "orders.add_m_order", "orders.change_m_order", "orders.submit_order",
+        "orders.cancel_order", "orders.view_m_order_line", "orders.view_m_order_event",
+        "orders.view_m_item", "orders.add_m_item", "orders.change_m_item", "orders.view_m_type_item",
+        "orders.view_m_brand",
+    ],
 }
 
 # workflow (= step) -> permisos que valida ``validate.permission`` antes del step.
@@ -28,4 +35,6 @@ WORKFLOWS = {
     "orders.items": ["orders.add_m_order"],
     "orders.pending_lines": ["trips.build_trip"],
     "orders.set_loading_point": ["orders.set_loading_point_order"],
+    "orders.company_items": ["orders.add_m_item"],
+    "orders.item.save": ["orders.add_m_item"],
 }

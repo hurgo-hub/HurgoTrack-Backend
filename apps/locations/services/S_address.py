@@ -3,7 +3,7 @@ from django.db import transaction
 from enginedj.base.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
 from enginedj.base.models import M_company
 from enginedj.base.services import BaseService
-from enginedj.base.services.permissions import has_perm, require_perm
+from enginedj.base.services.permissions import has_perm, require_perm, user_company_ids
 
 from apps.locations.entity import E_address
 from apps.locations.models import M_address, M_location
@@ -18,12 +18,6 @@ class S_address(BaseService[E_address]):
         super().__init__(repository=R_address(), entity_class=E_address)
         self.repository: R_address = self.repository
         self.r_tag = R_loading_tag()
-
-    def recipients(self, user, query: str = ""):
-        """Destinatarios con sus direcciones, para armar pedidos."""
-        if not (has_perm(user, "orders.add_m_order") or has_perm(user, "trips.build_trip")):
-            raise BusinessPermissionError("Solo comerciales y despacho consultan destinatarios.")
-        return self.repository.recipients((query or "").strip())
 
     # ------------------------------------------------------------------
     # Lugares de cargue (los registra y elige Hurgo)
@@ -121,9 +115,13 @@ class S_address(BaseService[E_address]):
     # Listas para formularios
     # ------------------------------------------------------------------
     def lookups(self, user):
-        self._require_dispatch(user)
-        companies = M_company.objects.filter(is_active=True).order_by("name").values(
-            "id", "name", "is_client", "is_recipient", "is_carrier")
+        """Despacho ve todas las empresas; los usuarios de una empresa, solo las suyas."""
+        companies = M_company.objects.filter(is_active=True).order_by("name")
+        if not self._is_hurgo(user):
+            if not has_perm(user, "locations.add_m_address"):
+                raise BusinessPermissionError("No tienes permiso para consultar estas listas.")
+            companies = companies.filter(pk__in=user_company_ids(user))
+        companies = companies.values("id", "name", "is_client", "is_freelance", "is_carrier")
         municipalities = M_location.objects.filter(is_active=True, location_type="municipality").select_related(
             "parent_id").order_by("name")
         return {
@@ -133,3 +131,52 @@ class S_address(BaseService[E_address]):
                 for m in municipalities
             ],
         }
+
+    # ------------------------------------------------------------------
+    # Direcciones de la empresa que pide (las de entrega las guarda ella misma).
+    # Hurgo: de cualquier empresa. Usuarios de la empresa: solo las suyas.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _is_hurgo(user):
+        return has_perm(user, MANAGE_PERM) or has_perm(user, "companies.create_company")
+
+    def _resolve_company(self, user, company_id):
+        """Sin company_id: la única empresa del usuario. Sin ser de Hurgo, solo sus empresas."""
+        own = user_company_ids(user)
+        if company_id is None:
+            if len(own) != 1:
+                raise BusinessError("Indica la empresa.", code="company_required")
+            company_id = own[0]
+        if not self._is_hurgo(user) and company_id not in own:
+            raise BusinessPermissionError("Solo puedes ver y guardar las direcciones de tu empresa.")
+        return company_id
+
+    def company_addresses(self, user, company_id=None):
+        company_id = self._resolve_company(user, company_id)
+        return list(M_address.objects.filter(company_id=company_id).select_related("location_id").order_by("name"))
+
+    @transaction.atomic
+    def save_company_address(self, user, data: dict):
+        """Crea o edita una dirección de la empresa (entrega, bodega, sede)."""
+        if not (self._is_hurgo(user) or has_perm(user, "locations.add_m_address")):
+            raise BusinessPermissionError("No tienes permiso para guardar direcciones.")
+        company_id = self._resolve_company(user, data.get("company_id"))
+        company = M_company.objects.filter(pk=company_id, is_active=True).first()
+        if company is None:
+            raise BusinessNotFound("La empresa no existe.")
+        location = M_location.objects.filter(pk=data["location_id"], is_active=True).first()
+        if location is None:
+            raise BusinessNotFound("El municipio no existe.")
+        if data.get("address_id"):
+            address = self.repository.get_for_update(data["address_id"])
+            if address is None or address.company_id_id != company.pk:
+                raise BusinessNotFound("La dirección no es de esta empresa.")
+        else:
+            address = M_address(company_id=company)
+        address.location_id = location
+        for field in ("name", "address", "description", "contact_name", "contact_phone"):
+            if field in data:
+                setattr(address, field, data[field] or "")
+        if "is_active" in data:
+            address.is_active = data["is_active"]
+        return self.repository.save_address(address, user)

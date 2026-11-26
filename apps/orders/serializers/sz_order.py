@@ -124,8 +124,7 @@ class Sz_pending_order_line(serializers.ModelSerializer):
 class Sz_order_line_in(serializers.Serializer):
     item_id = serializers.IntegerField()
     qty = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
-    recipient_id = serializers.IntegerField()
-    address_id = serializers.IntegerField()
+    address_id = serializers.IntegerField(help_text="Dirección de entrega de la empresa que pide.")
 
 
 class Sz_order_in(serializers.Serializer):
@@ -163,3 +162,35 @@ class Sz_cancel_in(Sz_order_id_in):
 class Sz_lookup_in(serializers.Serializer):
     company_id = serializers.IntegerField(required=False, allow_null=True)
     q = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class Sz_item(serializers.ModelSerializer):
+    type_item = serializers.CharField(source="type_item_id.name", read_only=True)
+    uses_stock = serializers.BooleanField(source="type_item_id.uses_stock", read_only=True)
+    loading_tags = serializers.SerializerMethodField()
+
+    class Meta:
+        model = M_item
+        fields = ["id", "company_id", "type_item_id", "type_item", "uses_stock", "sku", "odoo_ref", "name",
+                  "description", "unit", "weight_kg", "is_serialized", "is_active", "loading_tags"]
+
+    def get_loading_tags(self, obj):
+        return [{"id": t.id, "name": t.name} for t in obj.loading_tags.all()]
+
+
+class Sz_item_in(serializers.Serializer):
+    item_id = serializers.IntegerField(required=False, allow_null=True, help_text="Vacío = crear.")
+    company_id = serializers.IntegerField()
+    type_item_id = serializers.IntegerField()
+    name = serializers.CharField(max_length=200)
+    unit = serializers.ChoiceField(choices=[c[0] for c in M_item.unit_choices], required=False, default="und")
+    weight_kg = serializers.DecimalField(max_digits=10, decimal_places=3, required=False, allow_null=True)
+    sku = serializers.CharField(max_length=60, required=False, allow_blank=True)
+    odoo_ref = serializers.CharField(max_length=60, required=False, allow_blank=True)
+    description = serializers.CharField(required=False, allow_blank=True)
+    loading_tag_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    is_active = serializers.BooleanField(required=False)
+
+
+class Sz_company_items_in(serializers.Serializer):
+    company_id = serializers.IntegerField()

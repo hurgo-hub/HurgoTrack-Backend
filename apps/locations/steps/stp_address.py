@@ -2,22 +2,17 @@ from enginedj.base.steps.helpers import context_user, results, validate_input
 from enginedj.modules.registry import register_module
 
 from apps.locations.serializers import (
+    Sz_company_address,
+    Sz_company_address_in,
+    Sz_company_id_in,
     Sz_loading_point,
     Sz_loading_point_in,
     Sz_loading_points_in,
     Sz_loading_tag,
-    Sz_recipient_lookup,
     Sz_tag_in,
     Sz_tags_in,
 )
 from apps.locations.services import S_address
-
-
-@register_module("locations.recipients", important=True)
-def recipients(context, params, execution):
-    """Destinatarios con sus direcciones (para armar pedidos). Filtro opcional: q."""
-    addresses = S_address().recipients(context_user(context), context.get("q") or "")
-    return results(Sz_recipient_lookup(addresses, many=True).data)
 
 
 @register_module("locations.loading_points", important=True)
@@ -57,3 +52,18 @@ def create_loading_tag(context, params, execution):
 def lookups(context, params, execution):
     """Listas para los formularios de Hurgo: empresas activas (con su rol) y municipios."""
     return results(S_address().lookups(context_user(context)))
+
+
+@register_module("locations.addresses", important=True)
+def company_addresses(context, params, execution):
+    """Direcciones de una empresa: las de entrega y bodegas que ella guarda. Sin company_id = la del usuario."""
+    data = validate_input(Sz_company_id_in, context)
+    return results(Sz_company_address(S_address().company_addresses(context_user(context), data.get("company_id")),
+                                      many=True).data)
+
+
+@register_module("locations.address.save", important=True)
+def save_company_address(context, params, execution):
+    """Crea (sin address_id) o edita una dirección de la empresa."""
+    data = validate_input(Sz_company_address_in, context)
+    return results(Sz_company_address(S_address().save_company_address(context_user(context), data)).data)

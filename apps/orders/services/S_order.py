@@ -119,14 +119,13 @@ class S_order(BaseService[E_order]):
             if item is None:
                 raise BusinessError(f"El producto {line['item_id']} no existe o es de otra empresa.",
                                     code="invalid_item")
-            recipient = self.r_company.get_active(line["recipient_id"])
-            if recipient is None:
-                raise BusinessNotFound(f"El destinatario {line['recipient_id']} no existe.")
+            # La dirección de entrega es siempre de la empresa que pide (ella guarda sus direcciones)
             address = self.r_address.get_active(line["address_id"])
             if address is None:
                 raise BusinessNotFound(f"La dirección {line['address_id']} no existe.")
-            if address.company_id_id != recipient.pk:
-                raise BusinessError(f"La dirección '{address.name}' no pertenece a {recipient}.", code="address_mismatch")
+            if address.company_id_id != order.company_id_id:
+                raise BusinessError(f"La dirección '{address.name}' no es de {order.company_id}.",
+                                    code="address_mismatch")
             key = (item.pk, address.pk)
             if key in seen:
                 raise BusinessError(f"{item} está repetido para la misma dirección; suma las cantidades.",
@@ -137,7 +136,7 @@ class S_order(BaseService[E_order]):
                 raise BusinessError(f"La cantidad de {item} debe ser mayor que cero.")
             if item.is_serialized and qty != qty.to_integral_value():
                 raise BusinessError(f"{item} se pide por unidades enteras.", code="integer_qty")
-            rows.append(M_order_line(order_id=order, item_id=item, recipient_id=recipient, address_id=address,
+            rows.append(M_order_line(order_id=order, item_id=item, recipient_id=order.company_id, address_id=address,
                                      qty=qty, create_user=user))
         return rows
 

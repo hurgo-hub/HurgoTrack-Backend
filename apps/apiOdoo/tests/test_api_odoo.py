@@ -69,8 +69,7 @@ class ApiOdooTests(APITestCase):
     def requested_order(self):
         result = run_workflow(self.commercial, "orders.create", {
             "address_id": self.warehouse.id,
-            "lines": [{"item_id": self.cement.id, "qty": "10", "recipient_id": self.dealer.id,
-                       "address_id": self.dealer_addr.id}],
+            "lines": [{"item_id": self.cement.id, "qty": "10", "address_id": self.dealer_addr.id}],
         })
         self.assertTrue(result.ok, result.reason)
         return result.data

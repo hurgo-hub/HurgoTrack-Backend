@@ -61,9 +61,8 @@ class StockFlowTests(APITestCase):
         build_world(cls)
         city = M_location.objects.get(code_dane="20001")
         cls.distritodo = M_company.objects.create(name="Distritodo", document_number="950", is_client=True)
-        cls.store = M_company.objects.create(name="Ferretería San Sebastián", document_number="951", is_recipient=True)
-        cls.store_addr = M_address.objects.create(company_id=cls.store, name="San Sebastián", address="Cra 5",
-                                                  location_id=city)
+        cls.store_addr = M_address.objects.create(company_id=cls.distritodo, name="Ferretería San Sebastián",
+                                                  address="Cra 5", location_id=city)
         cls.argos = M_company.objects.create(name="Argos", document_number="952")
 
         stock_type = M_type_item.objects.create(name="Materiales con stock", uses_stock=True)
@@ -116,8 +115,7 @@ class StockFlowTests(APITestCase):
 
     def order(self, qty=200, loading=None):
         order = self.ok(run_workflow(self.dt_commercial, "orders.create", {
-            "lines": [{"item_id": self.cement.id, "qty": str(qty), "recipient_id": self.store.id,
-                       "address_id": self.store_addr.id}],
+            "lines": [{"item_id": self.cement.id, "qty": str(qty), "address_id": self.store_addr.id}],
         }))
         if loading:
             order = self.ok(run_workflow(self.dispatch, "orders.set_loading_point",
@@ -141,8 +139,7 @@ class StockFlowTests(APITestCase):
 
         # 1. El punto de venta pide 200 bolsas para San Sebastián, sin lugar de cargue
         order = self.ok(run_workflow(self.dt_commercial, "orders.create", {
-            "lines": [{"item_id": self.cement.id, "qty": "200", "recipient_id": self.store.id,
-                       "address_id": self.store_addr.id}],
+            "lines": [{"item_id": self.cement.id, "qty": "200", "address_id": self.store_addr.id}],
         }))
         self.assertIsNone(order["address"])
         line_id = order["lines"][0]["id"]

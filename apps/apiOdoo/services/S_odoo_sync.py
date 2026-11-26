@@ -100,8 +100,8 @@ class S_odoo_sync:
             raise BusinessError(f"El pedido {order.code} no tiene compra de Odoo.", code="odoo_required")
         purchase = S_odoo_purchase().get_or_sync(order.odoo_purchase, user)
         rows = "".join(
-            f"<li>{escape(line.item_id.name)}: {line.qty_delivered} → {escape(line.recipient_id.name)}</li>"
-            for line in order.order_line_order_id.select_related("item_id", "recipient_id")
+            f"<li>{escape(line.item_id.name)}: {line.qty_delivered} → {escape(line.address_id.name)}</li>"
+            for line in order.order_line_order_id.select_related("item_id", "address_id")
         )
         body = f"<p>Pedido <b>{escape(order.code)}</b> entregado por Hurgo Track.</p><ul>{rows}</ul>"
         try:

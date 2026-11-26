@@ -10,6 +10,10 @@ ROLES = {
         "stock.view_m_*", "stock.view_all_stock", "stock.view_all_purchase_request",
         "stock.manage_purchase_request", "stock.link_purchase_request",
     ],
+    "admin_empresa": [
+        "stock.view_m_stock", "stock.view_m_stock_move", "stock.view_m_purchase_request",
+        "stock.view_m_purchase_request_line", "stock.link_purchase_request",
+    ],
     "facturador": [
         "stock.view_m_stock", "stock.view_m_stock_move", "stock.view_m_purchase_request",
         "stock.view_m_purchase_request_line", "stock.link_purchase_request",

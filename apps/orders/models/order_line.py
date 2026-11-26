@@ -30,7 +30,7 @@ class M_order_line(M_model_base, models.Model):
                                 related_name="order_line_item_id", db_column="item_id")
     recipient_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                      related_name="order_line_recipient_id", db_column="recipient_id",
-                                     help_text="company_id del .mwb: a quién se entrega.")
+                                     help_text="Empresa que pide (dueña de la dirección de entrega); lo pone el sistema.")
     address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="order_line_address_id", db_column="address_id",
                                    help_text="Dirección de entrega.")
