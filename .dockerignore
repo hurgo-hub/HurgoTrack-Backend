@@ -11,3 +11,6 @@ staticfiles
 build
 dist
 *.egg-info
+# Tests automáticos: se quedan en git, pero no van en la imagen de producción
+apps/*/tests
+apps/testing.py

@@ -113,6 +113,14 @@ ROOT_URLCONF = "config.urls"
 
 # REST_FRAMEWORK viene de enginedj.settings: autenticación solo por la cookie "access_token"
 # (CookieJWTAuthentication). Web y app móvil inician sesión con POST /api/auth/token/.
+# Límite para el paso 1 del login (POST /api/auth/identify/), por cliente.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,  # noqa: F405
+    "DEFAULT_THROTTLE_RATES": {
+        **REST_FRAMEWORK.get("DEFAULT_THROTTLE_RATES", {}),  # noqa: F405
+        "auth_identify": env("AUTH_IDENTIFY_RATE", default="20/min"),
+    },
+}
 
 # WSGI_APPLICATION y ASGI_APPLICATION vienen de enginedj.settings:
 #   enginedj.wsgi.application
