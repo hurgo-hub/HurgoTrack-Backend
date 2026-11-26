@@ -1,6 +1,9 @@
 """Operaciones de Odoo que usa Hurgo Track (igual que ApiSintesisService en arquitecturabase)."""
 
+from django.conf import settings
+
 from apps.apiOdoo.repository import ApiOdooRepository
+from apps.apiOdoo.repository.simulated import SimulatedOdooRepository
 
 PURCHASE_FIELDS = ["id", "name", "state", "partner_id", "date_order", "amount_total", "order_line"]
 PARTNER_FIELDS = ["id", "name", "vat", "email", "phone", "is_company"]
@@ -11,7 +14,9 @@ PURCHASE_LINE_FIELDS = ["id", "order_id", "product_id", "name", "product_qty", "
 class ApiOdooService:
 
     def __init__(self, force_cache: bool = False):
-        self.repository = ApiOdooRepository(force_cache=force_cache)
+        # ODOO_SIMULATED: responde el Odoo simulado (sin red) en vez del real
+        repository = SimulatedOdooRepository if settings.ODOO_SIMULATED else ApiOdooRepository
+        self.repository = repository(force_cache=force_cache)
 
     def get_purchase(self, name: str) -> dict | None:
         """Compra (purchase.order) por su referencia, ej. P00012."""
