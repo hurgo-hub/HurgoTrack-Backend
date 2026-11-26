@@ -364,6 +364,12 @@ ODOO_USERNAME=
 ODOO_API_KEY=
 ```
 
+**Odoo simulado** (`ODOO_SIMULATED=True`, para probar sin el Odoo real): en Compras y al
+confirmar un pedido aparece "Simular compra en Odoo". Crea la compra confirmada con lo de la
+solicitud (referencia `SIM-<código>`, en la copia local marcada `raw.simulated`) y luego se
+registra con el flujo normal: lo comprado entra al stock igual que con una compra real.
+Los productos necesitan su Ref. Odoo (un número). Nunca lo enciendas junto a un Odoo real.
+
 ## Integración con Satrack (`apps.apiSatrack`)
 
 Posiciones GPS de los vehículos para el mapa del frontend (componentes de

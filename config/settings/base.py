@@ -56,7 +56,10 @@ DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)
 
 # Integración con Odoo (app apps.apiOdoo). Apagada por defecto: con
 # ODOO_ENABLED=False la confirmación de pedidos no consulta Odoo.
-ODOO_ENABLED = env.bool("ODOO_ENABLED", default=False)
+# ODOO_SIMULATED=True: Odoo simulado para probar sin el real (compras con "Simular compra en Odoo";
+# ver apps/apiOdoo/repository/simulated.py). Enciende la integración. Nunca junto a un Odoo real.
+ODOO_SIMULATED = env.bool("ODOO_SIMULATED", default=False)
+ODOO_ENABLED = env.bool("ODOO_ENABLED", default=False) or ODOO_SIMULATED
 ODOO_URL = env("ODOO_URL", default="")
 ODOO_DB = env("ODOO_DB", default="")
 ODOO_USERNAME = env("ODOO_USERNAME", default="")

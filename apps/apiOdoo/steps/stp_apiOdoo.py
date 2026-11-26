@@ -53,3 +53,39 @@ def notify_delivery(context, params, execution):
         raise BusinessPermissionError("No tienes permiso para sincronizar con Odoo.")
     data = validate_input(Sz_order_id_in, context)
     return results(S_odoo_sync().notify_delivery(data["order_id"], user))
+
+
+# ----------------------------------------------------------------------
+# Odoo simulado (ODOO_SIMULATED=True)
+# ----------------------------------------------------------------------
+from django.conf import settings  # noqa: E402
+from rest_framework import serializers  # noqa: E402
+
+from apps.apiOdoo.services import S_odoo_simulator  # noqa: E402
+
+
+class Sz_simulate_in(serializers.Serializer):
+    purchase_request_id = serializers.IntegerField(required=False, allow_null=True)
+    order_id = serializers.IntegerField(required=False, allow_null=True)
+
+
+@register_module("apiOdoo.mode", important=True)
+def odoo_mode(context, params, execution):
+    """Cómo está la integración: apagada, Odoo real o simulado (el frontend muestra el botón de simular)."""
+    return results({"enabled": settings.ODOO_ENABLED, "simulated": settings.ODOO_SIMULATED})
+
+
+@register_module("apiOdoo.simulate_purchase", important=True)
+@in_company_schema()
+def simulate_purchase(context, params, execution):
+    """Crea en el Odoo simulado la compra de una solicitud de compra (o de un pedido); devuelve su referencia
+    para registrarla después como una compra real."""
+    data = validate_input(Sz_simulate_in, context)
+    purchase = S_odoo_simulator().create_purchase(
+        context_user(context), context["company_id"], purchase_request_id=data.get("purchase_request_id"),
+        order_id=data.get("order_id"),
+    )
+    lines = purchase.odoo_purchase_line_purchase_id.order_by("odoo_line_id")
+    return results({"name": purchase.name, "state": purchase.state,
+                    "lines": [{"product": line.product_name, "qty": str(line.product_qty)} for line in lines]})
+

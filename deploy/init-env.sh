@@ -54,8 +54,9 @@ SATRACK_CLIENT_SECRET=
 SATRACK_USERNAME=
 SATRACK_PASSWORD=
 
-# Odoo
+# Odoo (ODOO_SIMULATED=True: Odoo simulado para probar sin el real; nunca junto al real)
 ODOO_ENABLED=False
+ODOO_SIMULATED=False
 ODOO_URL=
 ODOO_DB=
 ODOO_USERNAME=
