@@ -9,4 +9,5 @@ class FleetConfig(AppConfig):
 
     def ready(self):
         # Importar los steps para registrarlos en el motor
+        import apps.fleet.steps.stp_fleet  # noqa: F401
         import apps.fleet.steps.stp_vehicle  # noqa: F401

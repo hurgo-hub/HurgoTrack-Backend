@@ -2,6 +2,8 @@
 
 from enginedj.modules.registry import register_module
 
+from apps.companies.tenancy import in_company_schema
+
 from apps.apiOdoo.serializers import (
     Sz_odoo_purchase,
     Sz_order_id_in,
@@ -16,6 +18,7 @@ from enginedj.base.steps.helpers import context_user, results, validate_input
 
 
 @register_module("apiOdoo.get_purchase", important=True)
+@in_company_schema()
 def get_purchase(context, params, execution):
     """Consulta una compra en Odoo (por referencia) y actualiza la copia local."""
     user = context_user(context)
@@ -33,6 +36,7 @@ def get_create_partners(context, params, execution):
 
 
 @register_module("apiOdoo.get_create_products", important=True)
+@in_company_schema()
 def get_create_products(context, params, execution):
     """Crea / actualiza productos de una empresa desde Odoo."""
     data = validate_input(Sz_sync_products_in, context)
@@ -41,6 +45,7 @@ def get_create_products(context, params, execution):
 
 
 @register_module("apiOdoo.notify_delivery", important=True)
+@in_company_schema()
 def notify_delivery(context, params, execution):
     """Reenvía a Odoo la nota de entrega de un pedido (normalmente lo hace la tarea Celery)."""
     user = context_user(context)

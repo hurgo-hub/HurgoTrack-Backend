@@ -1,6 +1,7 @@
 from django.db import models
 
 from enginedj.base.models import M_model_base
+from apps.companies.uploads import PrivateUpload
 
 
 class M_mechanical_inspection(M_model_base, models.Model):
@@ -15,7 +16,7 @@ class M_mechanical_inspection(M_model_base, models.Model):
                                 help_text="name_cda del .mwb: centro de diagnóstico automotor.")
     date_expedition = models.DateField(null=False, blank=False)
     date_expire = models.DateField(null=False, blank=False, db_index=True)
-    file = models.FileField(upload_to="fleet/rtm/%Y/", null=True, blank=True)
+    file = models.FileField(upload_to=PrivateUpload("fleet/rtm"), null=True, blank=True)
 
     def __str__(self):
         return f"RTM {self.certificate_number} - {self.vehicle_id}"

@@ -24,6 +24,7 @@ from apps.orders.repository import R_order_line, R_order_line_trip
 from apps.orders.services import S_order_line
 from apps.stock.services import S_stock
 from apps.trips.entity import E_trip
+from apps.trips.models import M_trip_line
 from apps.trips.repository import R_trip, R_trip_line, R_trip_line_serie
 from apps.trips.services.S_trip_event import S_trip_event
 
@@ -89,9 +90,7 @@ class S_trip(BaseService[E_trip]):
             origin_address_id = self._loading_point_of(allocations)
         origin = R_address().get_active(origin_address_id)
         if origin is None:
-            raise BusinessNotFound("La dirección de origen no existe.")
-        if not origin.is_loading_point and origin.company_id_id != company.pk:
-            raise BusinessError(f"'{origin.name}' no es un lugar de cargue registrado.", code="not_loading_point")
+            raise BusinessNotFound("El lugar de cargue no existe.")
 
         trip = self.repository.create_trip(company_id=company, origin_address_id=origin,
                                            planned_departure=planned_departure, notes=notes or "",
@@ -166,8 +165,10 @@ class S_trip(BaseService[E_trip]):
             key = (line.recipient_id_id, line.address_id_id)
             stop = stops.get(key)
             if stop is None:
-                stop = self.r_line.create_stop(trip_id=trip, sequence=next_sequence, recipient_id_id=key[0],
-                                               address_id_id=key[1], create_user=user)
+                # La dirección vive en el esquema de la empresa: la parada (central) guarda su copia
+                stop = M_trip_line(trip_id=trip, sequence=next_sequence, recipient_id_id=key[0], create_user=user)
+                stop.copy_address(line.address_id)
+                stop = self.r_line.create_stop_from(stop)
                 stops[key] = stop
                 next_sequence += 1
             allocation = self.r_allocation.add_qty(line, stop, qty, user)
@@ -186,15 +187,15 @@ class S_trip(BaseService[E_trip]):
     def _check_single_brand(self, trip, user, new_items):
         """Regla: cada viaje de motos lleva una sola marca."""
         items = list(new_items) + self.r_allocation.items_of_trip(trip)
-        brands = {item.brand_id_id for item in items if item.is_vehicle}
+        brands = {item.brand_id.name if item.brand_id_id else None for item in items if item.is_vehicle}
         if not brands:
             return
         if None in brands:
             raise BusinessError("Las motos del viaje deben tener la marca registrada.", code="missing_brand")
-        if len(brands) > 1 or (trip.brand_id_id and trip.brand_id_id not in brands):
+        if len(brands) > 1 or (trip.brand_name and trip.brand_name not in brands):
             raise BusinessError("Un viaje de motos lleva una sola marca.", code="mixed_brand")
-        trip.brand_id_id = brands.pop()
-        self.repository.save_trip(trip, user, update_fields=["brand_id"])
+        trip.brand_name = brands.pop()
+        self.repository.save_trip(trip, user, update_fields=["brand_name"])
 
     @transaction.atomic
     def assign(self, user, trip_id, *, vehicle_id, driver_id, carrier_id=None):
@@ -300,22 +301,25 @@ class S_trip(BaseService[E_trip]):
         if existing:
             raise BusinessError(f"Ya existe el viaje de regreso {existing.code} para esta parada.")
 
-        r_address = R_address()
-        origin = stop.address_id
+        # El viaje de regreso sale de la dirección del cliente (en el esquema de la empresa; se
+        # anota en las notas) o de un lugar de cargue indicado, y vuelve al lugar de cargue original.
+        origin = None
         if origin_address_id is not None:
-            origin = r_address.get_active(origin_address_id)
+            origin = R_address().get_active(origin_address_id)
             if origin is None:
-                raise BusinessNotFound("La dirección de origen no existe.")
+                raise BusinessNotFound("El lugar de cargue de origen no existe.")
         warehouse = trip.origin_address_id
 
         return_trip = self.repository.create_trip(
-            company_id_id=trip.company_id_id, trip_type="return", brand_id_id=trip.brand_id_id,
+            company_id_id=trip.company_id_id, trip_type="return", brand_name=trip.brand_name,
             origin_address_id=origin, parent_trip_id=trip, returned_line_id=stop,
-            notes=f"Devolución de {trip.code}, parada {stop.sequence}: {stop.return_reason}", create_user=user,
+            notes=(f"Devolución de {trip.code}, parada {stop.sequence} ({stop.address_name}, {stop.address_text}): "
+                   f"{stop.return_reason}"), create_user=user,
         )
-        return_stop = self.r_line.create_stop(trip_id=return_trip, sequence=1, recipient_id_id=warehouse.company_id_id,
-                                              address_id=warehouse, qty=stop.qty, weight_kg=stop.weight_kg,
-                                              create_user=user)
+        return_stop = M_trip_line(trip_id=return_trip, sequence=1, recipient_id_id=warehouse.company_id_id,
+                                  qty=stop.qty, weight_kg=stop.weight_kg, create_user=user)
+        return_stop.copy_address(warehouse)
+        return_stop = self.r_line.create_stop_from(return_stop)
         r_serie = R_trip_line_serie()
         for serie in r_serie.of_stop(stop):
             r_serie.create_serie(trip_line_id=return_stop, vin=serie.vin, engine_number=serie.engine_number,

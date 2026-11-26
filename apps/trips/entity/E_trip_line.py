@@ -12,7 +12,7 @@ class E_trip_line(E_model_base):
         trip_id: Optional[int | dict] = None,
         sequence: Optional[int] = 1,
         recipient_id: Optional[int | dict] = None,
-        address_id: Optional[int | dict] = None,
+        address_ref: Optional[int] = None,
         estimated_date: Optional[datetime] = None,
         delivery_date: Optional[datetime] = None,
         qty: Optional[Decimal] = Decimal('0'),
@@ -29,7 +29,7 @@ class E_trip_line(E_model_base):
         self.trip_id = trip_id or kwargs.get("trip_id_id")
         self.sequence = sequence
         self.recipient_id = recipient_id or kwargs.get("recipient_id_id")
-        self.address_id = address_id or kwargs.get("address_id_id")
+        self.address_ref = address_ref
         self.estimated_date = estimated_date
         self.delivery_date = delivery_date
         self.qty = qty

@@ -1,8 +1,12 @@
 """Alta de empresa con su administrador y gestión de la empresa, por los workflows del motor."""
 
+import os
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from enginedj.base.models import M_company, M_user_company
@@ -19,7 +23,6 @@ class CompanyFlowTests(APITestCase):
     def setUpTestData(cls):
         build_world(cls)
         cls.city = M_location.objects.get(code_dane="20001")
-        cls.materials = M_type_item.objects.get(name="Materiales")
 
     def ok(self, result):
         self.assertTrue(result.ok, result.reason)
@@ -41,6 +44,7 @@ class CompanyFlowTests(APITestCase):
         company = self.ok(self.create_company())
         self.assertEqual((company["name"], company["is_client"], company["admin"]["role"]),
                          ("Distritodo", True, "admin_empresa"))
+        self.assertEqual(company["admins"], ["admin_900500"])  # la respuesta ya trae su admin
         admin = User.objects.get(username="admin_900500")
         self.assertTrue(admin.check_password(ADMIN_PASSWORD))
         self.assertTrue(M_user_company.objects.filter(user_id=admin, company_id=company["id"]).exists())
@@ -117,7 +121,7 @@ class CompanyFlowTests(APITestCase):
         materials = self.ok(run_workflow(admin, "catalogs.save", {"catalog": "type_item", "name": "Materiales"}))
         self.ok(run_workflow(admin, "catalogs.save", {"catalog": "unit", "name": "Bulto", "symbol": "bulto"}))
         self.assertIn("no existe o es de otra empresa", run_workflow(admin, "orders.item.save", {
-            "company_id": company["id"], "type_item_id": self.materials.id, "name": "X"}).reason)
+            "company_id": company["id"], "type_item_id": 9999, "name": "X"}).reason)
         item = self.ok(run_workflow(admin, "orders.item.save", {
             "company_id": company["id"], "type_item_id": materials["id"], "name": "Cemento gris", "unit": "bulto",
             "weight_kg": "50", "sku": "CEM-1"}))
@@ -172,3 +176,34 @@ class IdentifyTests(APITestCase):
         expected = {"company": None}
         for username in ("no-existe", "inactivo", "despacho"):
             self.assertEqual(self.identify(username), expected, username)
+
+
+class HurgoCompanySeedTests(APITestCase):
+    """La empresa Hurgo (transportador, dueña de la flota) la crea seed_workflows con los datos del .env."""
+
+    @classmethod
+    def setUpTestData(cls):
+        build_world(cls)  # ya trae una empresa "Hurgo" de prueba con NIT 900
+
+    def seed(self):
+        with open(os.devnull, "w") as devnull:
+            call_command("seed_workflows", stdout=devnull)
+
+    @override_settings(HURGO_COMPANY_NAME="Hurgo Transporte S.A.S.", HURGO_COMPANY_NIT="901777888", HURGO_COMPANY_DV="5")
+    def test_seed_creates_hurgo_company_once(self):
+        self.seed()
+        self.seed()
+        hurgo = M_company.objects.get(document_number="901777888")
+        self.assertEqual((hurgo.name, hurgo.verification_digit, hurgo.is_carrier, hurgo.is_client),
+                         ("Hurgo Transporte S.A.S.", "5", True, False))
+        self.assertFalse(hasattr(hurgo, "tenant") and hurgo.tenant)  # sin esquema propio
+        # No aparece entre las empresas cliente ni se edita desde ahí
+        listed = run_workflow(self.admin, "companies.list").data
+        self.assertNotIn(hurgo.id, [c["id"] for c in listed])
+        self.assertIn("se configura en el .env", run_workflow(
+            self.admin, "companies.update", {"company_id": hurgo.id, "is_active": False}).reason)
+
+    @override_settings(HURGO_COMPANY_NAME="Hurgo", HURGO_COMPANY_NIT="901")  # NIT de UMA (cliente)
+    def test_seed_refuses_a_client_nit(self):
+        with self.assertRaises(CommandError):
+            self.seed()

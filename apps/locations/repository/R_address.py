@@ -18,7 +18,7 @@ class R_address(BaseRepositoryImpl[E_address]):
     def loading_points(self, company_id=None, tag_ids=None, query: str = "", limit: int = 200) -> list[M_address]:
         """Lugares de cargue activos, con sus etiquetas precargadas."""
         qs = (
-            self.model.objects.filter(is_active=True, is_loading_point=True)
+            self.model.objects.filter(is_active=True)
             .select_related("company_id", "location_id")
             .prefetch_related("tags")
         )

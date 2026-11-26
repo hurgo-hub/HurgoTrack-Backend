@@ -103,6 +103,7 @@ class Sz_item_lookup(serializers.ModelSerializer):
 class Sz_pending_order_line(serializers.ModelSerializer):
     order_code = serializers.CharField(source="order_id.code", read_only=True)
     company_id = serializers.IntegerField(source="order_id.company_id_id", read_only=True)
+    company = serializers.CharField(source="order_id.company_id.name", read_only=True)
     recipient = serializers.CharField(source="recipient_id.name", read_only=True)
     address = serializers.CharField(source="address_id.name", read_only=True)
     item = serializers.CharField(source="item_id.name", read_only=True)
@@ -116,7 +117,7 @@ class Sz_pending_order_line(serializers.ModelSerializer):
 
     class Meta:
         model = M_order_line
-        fields = ["id", "order_id", "order_code", "company_id", "recipient", "address", "item_id", "item", "brand",
+        fields = ["id", "order_id", "order_code", "company_id", "company", "recipient", "address", "item_id", "item", "brand",
                   "qty", "qty_assigned", "qty_delivered", "qty_pending", "state", "loading_address_id",
                   "loading_address", "uses_stock", "stock_available"]
 

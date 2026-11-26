@@ -26,20 +26,33 @@ CORS_ALLOW_CREDENTIALS = True
 LANGUAGE_CODE = "es-co"
 TIME_ZONE = "America/Bogota"
 
-# Apps de Hurgo Track, una por grupo del modelo de datos. El core (tabla ``base``, empresas,
-# usuarios y utilidades compartidas) vive en EngineDj, rama HurgoCore (app ``enginedj.base``).
-INSTALLED_APPS += [
+# Un esquema de PostgreSQL por empresa (django-tenants), por aislamiento y seguridad:
+# - Esquema central ("public", Hurgo): motor, usuarios, roles, empresas, flota, viajes...
+# - Esquema de cada empresa ("c<id>"): sus catálogos, productos, pedidos, compras y stock.
+# El core (tabla ``base``, empresas, usuarios) vive en EngineDj, rama HurgoCore.
+HURGO_APPS = [
     "apps.locations",
     "apps.fleet",
     "apps.drivers",
-    "apps.orders",
     "apps.trips",
-    "apps.apiOdoo",
-    "apps.stock",
     "apps.companies",
     "apps.catalogs",
     "apps.apiSatrack",
 ]
+# Apps con datos de cada empresa: sus tablas solo existen en el esquema de cada empresa
+# (catálogos, productos, direcciones, pedidos, documentos, compras de Odoo y stock).
+COMPANY_APPS = [
+    "apps.orders",
+    "apps.apiOdoo",
+    "apps.stock",
+]
+SHARED_APPS = ["django_tenants", *INSTALLED_APPS, *HURGO_APPS]
+TENANT_APPS = [*COMPANY_APPS]
+INSTALLED_APPS = SHARED_APPS + [app for app in TENANT_APPS if app not in SHARED_APPS]
+
+TENANT_MODEL = "companies.M_tenant"
+TENANT_DOMAIN_MODEL = "companies.M_domain"
+DATABASE_ROUTERS = ("django_tenants.routers.TenantSyncRouter",)
 
 # Integración con Odoo (app apps.apiOdoo). Apagada por defecto: con
 # ODOO_ENABLED=False la confirmación de pedidos no consulta Odoo.
@@ -79,11 +92,14 @@ FIELD_ENCRYPTION_KEY = env("FIELD_ENCRYPTION_KEY", default="")
 DATABASES = {
     "default": env.db(),
 }
+# Solo PostgreSQL: cada empresa tiene su esquema (SQLite no tiene esquemas).
+if "postgresql" not in DATABASES["default"]["ENGINE"]:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured("Hurgo Track requiere PostgreSQL (un esquema por empresa): revisa DATABASE_URL.")
+DATABASES["default"]["ENGINE"] = "django_tenants.postgresql_backend"
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
-if "postgresql" in DATABASES["default"]["ENGINE"]:
-    DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = env.int(
-        "DB_CONNECT_TIMEOUT", default=5
-    )
+DATABASES["default"].setdefault("OPTIONS", {})["connect_timeout"] = env.int("DB_CONNECT_TIMEOUT", default=5)
 
 # Celery. En desarrollo se usa memoria para no depender de Redis/AMQP.
 # Para un worker real: CELERY_BROKER_URL=redis://localhost:6379/0 y
@@ -109,6 +125,12 @@ CELERY_BEAT_SCHEDULE = {
 }
 # Días de anticipación para avisar vencimiento de SOAT / revisión técnico-mecánica / licencia.
 HURGO_EXPIRATION_WARNING_DAYS = env.int("HURGO_EXPIRATION_WARNING_DAYS", default=30)
+
+# Empresa Hurgo: transportador dueño de la flota (esquema central, sin esquema propio).
+# ``seed_workflows`` la crea si no existe o actualiza su nombre (se busca por NIT).
+HURGO_COMPANY_NAME = env("HURGO_COMPANY_NAME", default="")
+HURGO_COMPANY_NIT = env("HURGO_COMPANY_NIT", default="")
+HURGO_COMPANY_DV = env("HURGO_COMPANY_DV", default="")
 
 ROOT_URLCONF = "config.urls"
 

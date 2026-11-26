@@ -10,7 +10,8 @@ from rest_framework.test import APITestCase
 
 from enginedj.base.models import M_user_company
 
-from apps.testing import build_world, proof_file, run_workflow
+from apps.orders.models import M_document_file
+from apps.testing import build_world, in_company, proof_file, run_workflow
 
 MEDIA_ROOT = tempfile.mkdtemp()
 
@@ -41,15 +42,23 @@ class DocumentTests(APITestCase):
         order = self.ok(run_workflow(self.commercial, "orders.create", {
             "address_id": self.warehouse.id, "lines": [{"item_id": self.cement.id, "qty": "5",
                                                         "address_id": self.dealer_addr.id}]}))
-        r = run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"], "odoo_purchase": "PO-1"})
+        confirm = {"order_id": order["id"], "odoo_purchase": "PO-1", "company_id": self.uma.id}
+        r = run_workflow(self.dispatch, "orders.confirm", confirm)
         self.assertIn("Faltan documentos del pedido: Factura", r.reason)
         # Otra empresa no sube documentos a este pedido
+        key = f"company:{factura['id']}"
         self.assertFalse(run_workflow(self.other_commercial, "orders.attach", {
-            "order_id": order["id"], "type_attach_id": factura["id"]}, files=[proof_file()]).ok)
+            "order_id": order["id"], "document_key": key}, files=[proof_file()]).ok)
         docs = self.ok(run_workflow(self.commercial, "orders.attach", {
-            "order_id": order["id"], "type_attach_id": factura["id"]}, files=[proof_file("factura.pdf")]))
-        self.assertEqual(len(next(d for d in docs if d["id"] == factura["id"])["files"]), 1)
-        self.ok(run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"], "odoo_purchase": "PO-1"}))
+            "order_id": order["id"], "document_key": key}, files=[proof_file("factura.pdf")]))
+        row = next(d for d in docs if d["key"] == key)["files"]
+        self.assertEqual([f["name"] for f in row], ["factura.pdf"])  # se muestra el nombre original
+        self.ok(run_workflow(self.dispatch, "orders.confirm", confirm))
+        # El archivo quedó en el esquema de la empresa, no en el central
+        with in_company(self.uma):
+            stored = M_document_file.objects.get(order_id=order["id"]).file.name
+        # Ruta no adivinable, dentro de la carpeta del esquema de la empresa
+        self.assertRegex(stored, rf"^companies/c{self.uma.id}/\d{{4}}/\d{{2}}/[0-9a-f]{{32}}-factura\.pdf$")
 
     def ready_trip(self):
         trip = self.ok(run_workflow(self.dispatch, "trips.build", {
@@ -70,10 +79,11 @@ class DocumentTests(APITestCase):
         # Cargue: sin la foto de cargue no sale; el otro conductor no la puede subir
         self.assertIn("Faltan documentos de cargue", run_workflow(
             self.driver_user, "trips.depart", {"trip_id": trip["id"]}).reason)
+        loading_key = f"hurgo:{loading['id']}"
         self.assertFalse(run_workflow(self.driver2_user, "trips.attach", {
-            "trip_id": trip["id"], "type_attach_id": loading["id"]}, files=[proof_file()]).ok)
+            "trip_id": trip["id"], "document_key": loading_key}, files=[proof_file()]).ok)
         self.ok(run_workflow(self.driver_user, "trips.attach", {
-            "trip_id": trip["id"], "type_attach_id": loading["id"]}, files=[proof_file()]))
+            "trip_id": trip["id"], "document_key": loading_key}, files=[proof_file()]))
         trip = self.ok(run_workflow(self.driver_user, "trips.depart", {"trip_id": trip["id"]}))
 
         # Entrega: el acta de la empresa va antes de la remisión, en esa parada
@@ -81,11 +91,13 @@ class DocumentTests(APITestCase):
         deliver = {"trip_id": trip["id"], "trip_line_id": stop["id"]}
         self.assertIn("faltan documentos de entrega: Acta de entrega", run_workflow(
             self.driver_user, "trips.deliver", deliver, files=[proof_file()]).reason)
+        acta_key = f"company:{acta['id']}"
         self.assertIn("Indica la parada", run_workflow(self.driver_user, "trips.attach", {
-            "trip_id": trip["id"], "type_attach_id": acta["id"]}, files=[proof_file()]).reason)
+            "trip_id": trip["id"], "document_key": acta_key}, files=[proof_file()]).reason)
         docs = self.ok(run_workflow(self.driver_user, "trips.attach", {
-            **deliver, "type_attach_id": acta["id"]}, files=[proof_file()]))
-        self.assertEqual(len(docs["delivery"][0]["documents"][0]["files"]), 1)
+            **deliver, "document_key": acta_key}, files=[proof_file()]))
+        acta_row = next(d for d in docs["delivery"][0]["documents"] if d["key"] == acta_key)
+        self.assertEqual(len(acta_row["files"]), 1)
         self.assertEqual(self.ok(run_workflow(self.driver_user, "trips.deliver", deliver,
                                               files=[proof_file()]))["state"], "closed")
 

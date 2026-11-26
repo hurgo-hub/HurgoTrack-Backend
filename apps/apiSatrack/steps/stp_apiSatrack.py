@@ -3,6 +3,8 @@
 from enginedj.base.steps.helpers import context_user, results, validate_input
 from enginedj.modules.registry import register_module
 
+from apps.companies.tenancy import in_company_schema, trip_company
+
 from apps.apiSatrack.serializers import Sz_history_in, Sz_map_overview_in, Sz_positions_in, Sz_trip_map_in
 from apps.apiSatrack.services import S_satrack, S_satrack_map
 
@@ -31,6 +33,7 @@ def map_overview(context, params, execution):
 
 
 @register_module("apiSatrack.trip_map")
+@in_company_schema(company_from=trip_company)  # el detalle del viaje lee datos de la empresa (VIN)
 def trip_map(context, params, execution):
     """Un viaje: arcos, paradas, vehículo y recorrido desde la salida."""
     data = validate_input(Sz_trip_map_in, context)

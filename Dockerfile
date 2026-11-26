@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# El core (EngineDj vH0.1.0) llega ya armado en vendor/: lo pone deploy/deploy.sh
+# El core (EngineDj vH0.1.1) llega ya armado en vendor/: lo pone deploy/deploy.sh
 # desde tu PC, así el servidor no necesita acceso a GitHub. Se instala por ruta
 # de archivo para que pip nunca lo busque en PyPI. Si el .whl cambia (moviste la
 # etiqueta), Docker vuelve a instalarlo.

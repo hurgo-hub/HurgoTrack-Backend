@@ -1,6 +1,7 @@
 from django.db import models
 
 from enginedj.base.models import M_model_base
+from apps.companies.uploads import PrivateUpload
 
 
 class M_trip_attach(M_model_base, models.Model):
@@ -15,7 +16,7 @@ class M_trip_attach(M_model_base, models.Model):
     type_attach_id = models.ForeignKey("trips.M_trip_type_attach", on_delete=models.PROTECT, null=False, blank=False,
                                        related_name="trip_attach_type_attach_id", db_column="type_attach_id",
                                        help_text="trip_type_attach_id del .mwb.")
-    file = models.FileField(upload_to="trips/%Y/%m/", null=False, blank=False)
+    file = models.FileField(upload_to=PrivateUpload("trips"), null=False, blank=False)
     description = models.CharField(max_length=255, null=False, blank=True, default="")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

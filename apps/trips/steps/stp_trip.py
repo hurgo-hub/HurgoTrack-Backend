@@ -2,6 +2,8 @@
 
 from enginedj.modules.registry import register_module
 
+from apps.companies.tenancy import in_company_schema, trip_company
+
 from enginedj.base.steps.helpers import context_user, results, validate_input
 from apps.trips.serializers import (
     Sz_allocations_in,
@@ -22,6 +24,7 @@ def trip_detail(user, trip_id):
 
 
 @register_module("trips.build", important=True)
+@in_company_schema()
 def build_trip(context, params, execution):
     """Paso 3: despacho arma el viaje con líneas de pedido confirmadas."""
     user = context_user(context)
@@ -33,6 +36,7 @@ def build_trip(context, params, execution):
 
 
 @register_module("trips.add_allocations", important=True)
+@in_company_schema(company_from=trip_company)
 def add_allocations(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_allocations_in, context)
@@ -41,6 +45,7 @@ def add_allocations(context, params, execution):
 
 
 @register_module("trips.assign", important=True)
+@in_company_schema(company_from=trip_company)
 def assign_trip(context, params, execution):
     """Paso 3: asigna vehículo y conductor."""
     user = context_user(context)
@@ -51,6 +56,7 @@ def assign_trip(context, params, execution):
 
 
 @register_module("trips.cancel", important=True)
+@in_company_schema(company_from=trip_company)
 def cancel_trip(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_cancel_in, context)
@@ -59,6 +65,7 @@ def cancel_trip(context, params, execution):
 
 
 @register_module("trips.depart", important=True)
+@in_company_schema(company_from=trip_company)
 def depart_trip(context, params, execution):
     """Paso 4: el conductor sale a ruta."""
     user = context_user(context)
@@ -68,6 +75,7 @@ def depart_trip(context, params, execution):
 
 
 @register_module("trips.create_return_trip", important=True)
+@in_company_schema(company_from=trip_company)
 def create_return_trip(context, params, execution):
     """Despacho genera el viaje de regreso de una parada devuelta."""
     user = context_user(context)
@@ -78,6 +86,7 @@ def create_return_trip(context, params, execution):
 
 
 @register_module("trips.retrieve", important=True)
+@in_company_schema(company_from=trip_company)
 def retrieve_trip(context, params, execution):
     """Detalle con paradas, productos, VIN, eventos y fotos."""
     user = context_user(context)

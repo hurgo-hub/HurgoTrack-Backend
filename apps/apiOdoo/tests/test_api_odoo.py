@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 
 from apps.apiOdoo.models import M_odoo_purchase, M_odoo_sync_log
 from enginedj.base.models import M_company
-from apps.testing import build_world, proof_file, run_workflow
+from apps.testing import build_world, in_company, proof_file, run_workflow
 
 MEDIA_ROOT = tempfile.mkdtemp()
 ODOO = {"ODOO_ENABLED": True, "ODOO_URL": "https://odoo.test", "ODOO_DB": "hurgo", "ODOO_USERNAME": "api@hurgo.co",
@@ -78,16 +78,21 @@ class ApiOdooTests(APITestCase):
         fake = FakeOdoo([purchase(), purchase("P00013", state="draft")])
         with mock.patch("apps.apiOdoo.repository.apiOdoo.requests.post", side_effect=fake):
             order = self.requested_order()
-            result = run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"], "odoo_purchase": "P00099"})
+            confirm = {"order_id": order["id"], "company_id": self.uma.id}
+            result = run_workflow(self.dispatch, "orders.confirm", {**confirm, "odoo_purchase": "P00099"})
             self.assertIn("no existe en Odoo", result.reason)
-            result = run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"], "odoo_purchase": "P00013"})
+            result = run_workflow(self.dispatch, "orders.confirm", {**confirm, "odoo_purchase": "P00013"})
             self.assertIn("estado 'draft'", result.reason)
-            result = run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"], "odoo_purchase": "P00012"})
+            result = run_workflow(self.dispatch, "orders.confirm", {**confirm, "odoo_purchase": "P00012"})
             self.assertTrue(result.ok, result.reason)
         self.assertEqual(result.data["state"], "confirmed")
-        mirror = M_odoo_purchase.objects.get(name="P00012")
-        self.assertEqual((mirror.odoo_id, mirror.partner_name, mirror.state), (12, "UMA S.A.S.", "purchase"))
-        self.assertEqual(M_odoo_sync_log.objects.filter(operation="get_purchase", status="success").count(), 1)
+        # La compra y su bitácora quedan en el esquema de la empresa
+        with in_company(self.uma):
+            mirror = M_odoo_purchase.objects.get(name="P00012")
+            self.assertEqual((mirror.odoo_id, mirror.partner_name, mirror.state), (12, "UMA S.A.S.", "purchase"))
+            self.assertEqual(M_odoo_sync_log.objects.filter(operation="get_purchase", status="success").count(), 1)
+        with in_company(self.akt):
+            self.assertFalse(M_odoo_purchase.objects.exists())
         self.assertEqual(sum(1 for service, _ in fake.calls if service == "common"), 1)  # uid en caché
 
     def test_delivered_order_is_notified_to_odoo(self):
@@ -95,7 +100,8 @@ class ApiOdooTests(APITestCase):
         with mock.patch("apps.apiOdoo.repository.apiOdoo.requests.post", side_effect=fake), \
                 self.captureOnCommitCallbacks(execute=True):
             order = self.requested_order()
-            run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"], "odoo_purchase": "P00012"})
+            run_workflow(self.dispatch, "orders.confirm",
+                         {"order_id": order["id"], "odoo_purchase": "P00012", "company_id": self.uma.id})
             trip = run_workflow(self.dispatch, "trips.build", {
                 "company_id": self.uma.id, "origin_address_id": self.warehouse.id,
                 "allocations": [{"order_line_id": order["lines"][0]["id"], "qty": "10"}],
@@ -110,7 +116,8 @@ class ApiOdooTests(APITestCase):
         self.assertEqual(len(posts), 1)
         self.assertEqual(posts[0][5], [[12]])
         self.assertIn(order["code"], posts[0][6]["body"])
-        self.assertTrue(M_odoo_sync_log.objects.filter(operation="notify_delivery", status="success").exists())
+        with in_company(self.uma):
+            self.assertTrue(M_odoo_sync_log.objects.filter(operation="notify_delivery", status="success").exists())
 
     def test_sync_partners_creates_and_updates_companies(self):
         fake = FakeOdoo(partners=[
@@ -130,5 +137,5 @@ class ApiOdooTests(APITestCase):
 
     @override_settings(ODOO_URL="")
     def test_missing_configuration_is_reported(self):
-        result = run_workflow(self.dispatch, "apiOdoo.get_purchase", {"name": "P00012"})
+        result = run_workflow(self.dispatch, "apiOdoo.get_purchase", {"name": "P00012", "company_id": self.uma.id})
         self.assertIn("Falta configurar Odoo: ODOO_URL", result.reason)

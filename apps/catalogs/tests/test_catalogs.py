@@ -5,8 +5,8 @@ from rest_framework.test import APITestCase
 
 from enginedj.base.models import M_user_company
 
-from apps.testing import build_world, run_workflow
-from apps.trips.models import M_trip_type_attach
+from apps.orders.models import M_document_type, M_type_item
+from apps.testing import build_world, in_company, run_workflow
 
 
 class CatalogTests(APITestCase):
@@ -40,13 +40,21 @@ class CatalogTests(APITestCase):
         # Cada empresa ve solo lo suyo
         self.assertEqual({r["name"] for r in self.rows(self.uma_admin, "unit")}, {"Caja", "Bulto"})
         self.assertEqual({r["name"] for r in self.rows(self.akt_admin, "unit")}, set())
-        akt_type = next(r for r in self.rows(self.akt_admin, "type_item") if r["name"] == "Repuestos")
-        self.assertIn("no es tuyo", self.save(self.uma_admin, "type_item", id=akt_type["id"], name="X").reason)
+        # Cada empresa trabaja en su esquema: un id que no está en el suyo no existe para ella
+        self.assertIn("no existe o no es tuyo", self.save(self.uma_admin, "type_item", id=9999, name="X").reason)
+        with in_company(self.akt):
+            self.assertEqual(list(M_type_item.objects.values_list("name", flat=True).order_by("name")),
+                             ["Materiales", "Repuestos"])
 
     def test_hurgo_does_not_create_company_catalogs(self):
         tabs = {c["key"] for c in self.ok(run_workflow(self.admin, "catalogs.available"))}
         self.assertNotIn("unit", tabs)
         self.assertIn("loading_tag", tabs)
+        # Tampoco un superusuario de Hurgo (tiene todos los permisos, pero no es de ninguna empresa)
+        root_tabs = {c["key"] for c in self.ok(run_workflow(self.superuser, "catalogs.available"))}
+        self.assertNotIn("unit", root_tabs)
+        self.assertIn("loading_tag", root_tabs)
+        self.assertIn("lo gestiona cada empresa", self.save(self.superuser, "unit", name="Galón", symbol="gal").reason)
         self.assertIn("lo gestiona cada empresa", self.save(self.admin, "unit", name="Galón", symbol="gal").reason)
         self.assertIn("lo gestiona cada empresa", self.save(self.admin, "brand", name="X").reason)
         # Y la empresa no toca los de logística
@@ -56,11 +64,11 @@ class CatalogTests(APITestCase):
 
     def test_company_documents_and_hurgo_process_documents(self):
         doc = self.ok(self.save(self.uma_admin, "document_type", name="Factura", stage="order", is_required=True))
-        self.assertEqual(M_trip_type_attach.objects.get(pk=doc["id"]).company_id_id, self.uma.id)
-        # La empresa ve sus documentos y, solo para leer, los del proceso de Hurgo
-        rows = {r["name"]: r for r in self.rows(self.uma_admin, "document_type")}
-        self.assertFalse(rows["Factura"]["read_only"])
-        self.assertTrue(rows["Remisión firmada"]["read_only"])
+        # Sus documentos viven en su esquema; los del proceso de Hurgo en el central
+        with in_company(self.uma):
+            self.assertTrue(M_document_type.objects.filter(pk=doc["id"], name="Factura").exists())
+        self.assertEqual({r["name"] for r in self.rows(self.uma_admin, "document_type")}, {"Factura"})
+        self.assertEqual(self.rows(self.akt_admin, "document_type"), [])
         self.assertIn("Valor inválido", self.save(self.uma_admin, "document_type", name="X", stage="otra").reason)
         # Hurgo ve y edita solo los del proceso; no puede desactivar los que usa el sistema
         hurgo = {r["name"]: r for r in self.rows(self.admin, "process_document_type")}
@@ -70,12 +78,32 @@ class CatalogTests(APITestCase):
             is_active=False).reason)
 
     def test_products_use_own_catalogs_only(self):
-        akt_unit = self.ok(self.save(self.akt_admin, "unit", name="Saco", symbol="saco"))
         type_id = self.ok(self.save(self.uma_admin, "type_item", name="Áridos"))["id"]
         r = run_workflow(self.uma_admin, "orders.item.save", {
-            "company_id": self.uma.id, "type_item_id": type_id, "name": "Arena", "unit_id": akt_unit["id"]})
+            "company_id": self.uma.id, "type_item_id": type_id, "name": "Arena", "unit_id": 9999})
         self.assertIn("unidad no existe o es de otra empresa", r.reason)
         own = self.ok(self.save(self.uma_admin, "unit", name="Saco", symbol="saco"))
         item = self.ok(run_workflow(self.uma_admin, "orders.item.save", {
             "company_id": self.uma.id, "type_item_id": type_id, "name": "Arena", "unit_id": own["id"]}))
         self.assertEqual((item["unit"], item["unit_name"]), ("saco", "Saco"))
+
+    def test_company_tags_its_products_with_hurgo_loading_tags(self):
+        tag = self.ok(run_workflow(self.admin, "locations.loading_tag.create", {"name": "Áridos"}))
+        # La empresa ve solo el id y el nombre de las etiquetas de Hurgo, y no crea etiquetas
+        tags = self.ok(run_workflow(self.uma_admin, "locations.loading_tags"))
+        self.assertEqual(tags, [{"id": tag["id"], "name": "Áridos"}])
+        self.assertFalse(run_workflow(self.uma_admin, "locations.loading_tag.create", {"name": "X"}).ok)
+        self.assertFalse(run_workflow(self.commercial, "locations.loading_tags").ok)  # no gestiona productos
+        type_id = self.ok(self.save(self.uma_admin, "type_item", name="Áridos"))["id"]
+        item = self.ok(run_workflow(self.uma_admin, "orders.item.save", {
+            "company_id": self.uma.id, "type_item_id": type_id, "name": "Arena", "loading_tag_ids": [tag["id"]]}))
+        self.assertEqual(item["loading_tags"], [{"id": tag["id"], "name": "Áridos"}])
+
+    def test_hurgo_role_has_no_company_data_permissions(self):
+        """Hurgo es el eje logístico: su rol no trae permisos para crear datos de las empresas."""
+        for perm in ("orders.add_m_item", "orders.change_m_item", "orders.add_m_unit", "orders.add_m_type_item",
+                     "orders.add_m_brand", "orders.add_m_order", "locations.add_m_address",
+                     "catalogs.manage_company_catalogs", "companies.manage_company"):
+            self.assertFalse(self.admin.has_perm(perm), perm)
+            self.assertFalse(self.dispatch.has_perm(perm) and perm != "orders.add_m_order", perm)
+        self.assertTrue(self.admin.has_perm("orders.confirm_order"))

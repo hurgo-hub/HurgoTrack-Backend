@@ -16,10 +16,11 @@ from rest_framework.test import APITestCase
 from enginedj.base.models import M_company, M_user_company
 from enginedj.notification.models import M_notification
 
-from apps.locations.models import M_address, M_loading_tag, M_location
-from apps.orders.models import M_item, M_order_line, M_type_item, M_unit
+from apps.locations.models import M_loading_tag, M_location
+from apps.orders.models import M_company_address, M_item, M_order_line, M_type_item, M_unit
 from apps.stock.models import M_stock, M_stock_move
-from apps.testing import PASSWORD, build_world, proof_file, run_workflow
+from apps.companies.tenancy import create_company_schema
+from apps.testing import in_company, PASSWORD, build_world, proof_file, run_workflow
 
 MEDIA_ROOT = tempfile.mkdtemp()
 
@@ -59,20 +60,25 @@ class StockFlowTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         build_world(cls)
+        cls.cement_uma_id = cls.cement.id  # cemento de UMA (tipo sin stock), antes de usar el de Distritodo
         city = M_location.objects.get(code_dane="20001")
         cls.distritodo = M_company.objects.create(name="Distritodo", document_number="950", is_client=True)
-        cls.store_addr = M_address.objects.create(company_id=cls.distritodo, name="Ferretería San Sebastián",
-                                                  address="Cra 5", location_id=city)
+        create_company_schema(cls.distritodo)
         cls.argos = M_company.objects.create(name="Argos", document_number="952")
+        cls.tag_cement = M_loading_tag.objects.create(name="Cemento")  # central (logística de Hurgo)
 
-        stock_type = M_type_item.objects.create(name="Materiales con stock", uses_stock=True)
-        M_unit.objects.create(company_id=cls.distritodo, symbol="bulto", name="Bulto")
-        cls.cement = M_item.objects.create(company_id=cls.distritodo, type_item_id=stock_type, name="Cemento gris",
-                                           unit="bulto", weight_kg=Decimal("50"), odoo_ref="501")
-        cls.brick = M_item.objects.create(company_id=cls.distritodo, type_item_id=stock_type, name="Ladrillo",
-                                          odoo_ref="502")
-        cls.tag_cement = M_loading_tag.objects.create(name="Cemento")
-        cls.cement.loading_tags.add(cls.tag_cement)
+        with in_company(cls.distritodo):  # sus datos viven en su esquema
+            cls.store_addr = M_company_address.objects.create(company_id=cls.distritodo, location_id=city,
+                                                              name="Ferretería San Sebastián", address="Cra 5")
+            stock_type = M_type_item.objects.create(company_id=cls.distritodo, name="Materiales con stock",
+                                                    uses_stock=True)
+            M_unit.objects.create(company_id=cls.distritodo, symbol="bulto", name="Bulto")
+            cls.cement = M_item.objects.create(company_id=cls.distritodo, type_item_id=stock_type,
+                                               name="Cemento gris", unit="bulto", weight_kg=Decimal("50"),
+                                               odoo_ref="501")
+            cls.brick = M_item.objects.create(company_id=cls.distritodo, type_item_id=stock_type, name="Ladrillo",
+                                              odoo_ref="502")
+            cls.cement.loading_tags.add(cls.tag_cement)
 
         def user(username, role):
             u = User.objects.create_user(username, f"{username}@test.co", PASSWORD)
@@ -94,8 +100,9 @@ class StockFlowTests(APITestCase):
         return result.data
 
     def stock(self, item=None):
-        row = M_stock.objects.filter(company_id=self.distritodo, item_id=item or self.cement).first()
-        return row.qty_available if row else Decimal("0")
+        with in_company(self.distritodo):
+            row = M_stock.objects.filter(company_id=self.distritodo, item_id=item or self.cement).first()
+            return row.qty_available if row else Decimal("0")
 
     def request(self, qty, order_line=None, user=None):
         return run_workflow(user or self.dispatch, "stock.purchase_request.create", {
@@ -119,9 +126,10 @@ class StockFlowTests(APITestCase):
             "lines": [{"item_id": self.cement.id, "qty": str(qty), "address_id": self.store_addr.id}],
         }))
         if loading:
-            order = self.ok(run_workflow(self.dispatch, "orders.set_loading_point",
-                                         {"order_id": order["id"], "address_id": loading["id"]}))
-        return self.ok(run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"]}))
+            order = self.ok(run_workflow(self.dispatch, "orders.set_loading_point", {
+                "order_id": order["id"], "address_id": loading["id"], "company_id": self.distritodo.id}))
+        return self.ok(run_workflow(self.dispatch, "orders.confirm",
+                                    {"order_id": order["id"], "company_id": self.distritodo.id}))
 
     def requirement(self):
         rows = self.ok(run_workflow(self.dispatch, "stock.requirements", {"company_id": self.distritodo.id}))
@@ -167,12 +175,14 @@ class StockFlowTests(APITestCase):
         self.assertEqual(self.stock(), Decimal("200"))
 
         # 6. Hurgo elige el lugar de cargue (sugerido por la etiqueta Cemento) y confirma sin compra
-        points = self.ok(run_workflow(self.dispatch, "locations.loading_points", {"order_id": order["id"]}))
+        points = self.ok(run_workflow(self.dispatch, "locations.loading_points",
+                                      {"order_id": order["id"], "order_company_id": self.distritodo.id}))
         self.assertEqual((points[0]["id"], points[0]["suggested"], points[0]["matching_tags"]),
                          (plant["id"], True, ["Cemento"]))
         self.ok(run_workflow(self.dispatch, "orders.set_loading_point",
-                             {"order_id": order["id"], "address_id": plant["id"]}))
-        order = self.ok(run_workflow(self.dispatch, "orders.confirm", {"order_id": order["id"]}))
+                             {"order_id": order["id"], "address_id": plant["id"], "company_id": self.distritodo.id}))
+        order = self.ok(run_workflow(self.dispatch, "orders.confirm",
+                                     {"order_id": order["id"], "company_id": self.distritodo.id}))
         self.assertEqual((order["state"], order["address"]["id"], order["odoo_purchase"]),
                          ("confirmed", plant["id"], ""))
 
@@ -186,7 +196,8 @@ class StockFlowTests(APITestCase):
         }))
         self.assertEqual(trip["origin_address"], "Planta Argos")
         self.assertEqual(self.stock(), Decimal("50"))
-        line = M_order_line.objects.get(pk=line_id)
+        with in_company(self.distritodo):
+            line = M_order_line.objects.get(pk=line_id)
         self.assertEqual((line.state, line.qty_pending), ("partial", Decimal("50")))
 
         # No se carga más de lo que hay en stock (otro pedido de 100 con el mismo cargue; solo quedan 50)
@@ -201,7 +212,8 @@ class StockFlowTests(APITestCase):
         # 10. Si el viaje se cancela, las bolsas vuelven al stock y al pedido
         self.ok(run_workflow(self.dispatch, "trips.cancel", {"trip_id": trip["id"], "reason": "Sin camión"}))
         self.assertEqual(self.stock(), Decimal("200"))
-        line.refresh_from_db()
+        with in_company(self.distritodo):
+            line.refresh_from_db()
         self.assertEqual(line.state, "pending")
 
         moves = self.ok(run_workflow(self.dispatch, "stock.moves", {"company_id": self.distritodo.id}))
@@ -225,7 +237,8 @@ class StockFlowTests(APITestCase):
                              {"trip_id": trip["id"], "trip_line_id": trip["lines"][0]["id"], "reason": "Cerrado"},
                              files=[proof_file()]))
         self.assertEqual(self.stock(), Decimal("100"))
-        self.assertTrue(M_stock_move.objects.filter(move_type="return_in", qty=Decimal("80")).exists())
+        with in_company(self.distritodo):
+            self.assertTrue(M_stock_move.objects.filter(move_type="return_in", qty=Decimal("80")).exists())
 
     def test_one_loading_point_per_trip(self):
         self.initial_stock()
@@ -263,7 +276,7 @@ class StockFlowTests(APITestCase):
         self.assertFalse(run_workflow(self.biller, "stock.requirements", {"company_id": self.uma.id}).ok)
         # Productos sin stock (cemento de UMA, tipo Materiales normal) no van en solicitudes
         r = run_workflow(self.dispatch, "stock.purchase_request.create", {
-            "company_id": self.uma.id, "lines": [{"item_id": M_item.objects.get(name="Cemento").id, "qty": "1"}],
+            "company_id": self.uma.id, "lines": [{"item_id": self.cement_uma_id, "qty": "1"}],
         })
         self.assertIn("no se maneja con stock", r.reason)
         self.assertEqual(req["state"], "sent")

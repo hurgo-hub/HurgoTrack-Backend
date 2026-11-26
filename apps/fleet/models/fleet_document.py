@@ -1,6 +1,7 @@
 from django.db import models
 
 from enginedj.base.models import M_catalog_base, M_model_base
+from apps.companies.uploads import PrivateUpload
 
 
 class M_fleet_document_type(M_catalog_base, models.Model):
@@ -25,7 +26,7 @@ class M_vehicle_document(M_model_base, models.Model):
                                    related_name="vehicle_document_vehicle_id", db_column="vehicle_id")
     type_id = models.ForeignKey("fleet.M_fleet_document_type", on_delete=models.PROTECT, null=False, blank=False,
                                 related_name="vehicle_document_type_id", db_column="type_id")
-    file = models.FileField(upload_to="fleet/documents/%Y/", null=False, blank=False)
+    file = models.FileField(upload_to=PrivateUpload("fleet/documents"), null=False, blank=False)
     date_expire = models.DateField(null=True, blank=True, db_index=True)
 
     class Meta:
@@ -40,7 +41,7 @@ class M_driver_document(M_model_base, models.Model):
                                   related_name="driver_document_driver_id", db_column="driver_id")
     type_id = models.ForeignKey("fleet.M_fleet_document_type", on_delete=models.PROTECT, null=False, blank=False,
                                 related_name="driver_document_type_id", db_column="type_id")
-    file = models.FileField(upload_to="drivers/documents/%Y/", null=False, blank=False)
+    file = models.FileField(upload_to=PrivateUpload("drivers/documents"), null=False, blank=False)
     date_expire = models.DateField(null=True, blank=True, db_index=True)
 
     class Meta:

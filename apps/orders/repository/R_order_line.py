@@ -99,8 +99,8 @@ class R_order_line(InvalidateAppsMixin, BaseRepositoryImpl[E_order_line]):
                 order_id__state__in=["confirmed", "in_progress"],
                 state__in=["pending", "partial"],
             )
-            .select_related("order_id__address_id", "recipient_id", "address_id", "item_id__brand_id",
-                            "item_id__type_item_id")
+            .select_related("order_id__address_id", "order_id__company_id", "recipient_id", "address_id",
+                            "item_id__brand_id", "item_id__type_item_id")
             .order_by("order_id__order_date", "order_id", "id")
         )
         if company_id:

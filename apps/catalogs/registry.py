@@ -2,10 +2,8 @@
 
 Quién es dueño de qué:
 - ``company``: los crea y edita cada empresa para lo suyo (tipos de producto, unidades, marcas,
-  documentos que exige). Hurgo no los crea. ``show_common``: además muestra, solo para leer,
-  los registros de Hurgo (``company_id`` nulo), ej. los documentos del proceso de Hurgo.
-- ``hurgo``: logística de Hurgo (etiquetas de cargue, flota, documentos del proceso). Con
-  ``common_only`` el modelo es compartido y Hurgo solo ve/edita sus registros (``company_id`` nulo).
+  documentos que exige). Viven en el esquema de la empresa; Hurgo no los crea.
+- ``hurgo``: logística de Hurgo (etiquetas de cargue, flota, documentos del proceso), en el esquema central.
 
 ``fields``: campos editables además de ``name`` -> "text" | "bool" | "choice:valor=Etiqueta,...".
 """
@@ -13,6 +11,7 @@ Quién es dueño de qué:
 from dataclasses import dataclass, field
 
 STAGES = "choice:order=Pedido,loading=Cargue,delivery=Entrega,return=Devolución,novelty=Novedad"
+PROCESS_STAGES = "choice:loading=Cargue,delivery=Entrega,return=Devolución,novelty=Novedad"
 
 
 @dataclass(frozen=True)
@@ -22,8 +21,6 @@ class Catalog:
     model: str  # "app_label.ModelName"
     scope: str  # "company" | "hurgo"
     fields: dict = field(default_factory=dict)
-    show_common: bool = False
-    common_only: bool = False
 
 
 CATALOGS = {c.key: c for c in [
@@ -32,11 +29,11 @@ CATALOGS = {c.key: c for c in [
             {"uses_stock": "bool", "is_serialized": "bool"}),
     Catalog("unit", "Unidades", "orders.M_unit", "company", {"symbol": "text"}),
     Catalog("brand", "Marcas", "orders.M_brand", "company"),
-    Catalog("document_type", "Documentos que exige", "trips.M_trip_type_attach", "company",
-            {"stage": STAGES, "is_required": "bool"}, show_common=True),
+    Catalog("document_type", "Documentos que exige", "orders.M_document_type", "company",
+            {"stage": STAGES, "is_required": "bool"}),
     # De Hurgo (logística)
     Catalog("process_document_type", "Documentos del proceso", "trips.M_trip_type_attach", "hurgo",
-            {"stage": STAGES, "is_required": "bool"}, common_only=True),
+            {"stage": PROCESS_STAGES, "is_required": "bool"}),
     Catalog("loading_tag", "Etiquetas de cargue", "locations.M_loading_tag", "hurgo"),
     Catalog("type_vehicle", "Tipos de vehículo", "fleet.M_type_vehicle", "hurgo"),
     Catalog("brand_vehicle", "Marcas de vehículo", "fleet.M_brand_vehicle", "hurgo"),

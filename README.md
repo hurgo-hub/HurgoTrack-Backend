@@ -13,18 +13,19 @@ Usa los entrypoints del motor:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt   # EngineDj vH0.1.0 (con el core de Hurgo Track) + requests
+pip install -r requirements.txt   # EngineDj vH0.1.1 (con el core de Hurgo Track) + requests
 cp .env.example .env
 # Edita .env: DATABASE_URL debe apuntar a tu PostgreSQL.
-python manage.py migrate
-python manage.py seed_workflows # roles, permisos, tipos de adjunto y workflows (seeds.py de cada app)
+python manage.py migrate_schemas --shared   # esquema central (public)
+python manage.py migrate_schemas --tenant   # esquema de cada empresa (si ya hay empresas)
+python manage.py seed_workflows # roles, permisos, municipios (DIVIPOLA), documentos y workflows
 python manage.py runserver
 ```
 
 El core (EngineDj) es otro repositorio y aquí solo entra como dependencia, siempre
-en la versión **vH0.1.0**. Este repo no guarda código ni un clon del motor.
+en la versión **vH0.1.1**. Este repo no guarda código ni un clon del motor.
 
-Cuando se actualice vH0.1.0 en EngineDj, reinstálalo (pip no lo hace solo porque la
+Cuando se actualice vH0.1.1 en EngineDj, reinstálalo (pip no lo hace solo porque la
 versión del paquete no cambia):
 
 ```bash
@@ -34,8 +35,22 @@ pip install --force-reinstall --no-deps -r requirements.txt
 Para probar cambios del core antes de publicarlos, instala en el venv tu clon de
 EngineDj, que vive fuera de este repo: `pip install --no-deps -e /ruta/a/EngineDj`.
 
-Requiere PostgreSQL 14 o superior. Si prefieres SQLite para una prueba
-rápida, cambia `DATABASE_URL=sqlite:///db.sqlite3` en `.env`.
+Requiere PostgreSQL 14 o superior (SQLite no sirve: no tiene esquemas).
+
+## Un esquema por empresa
+
+Cada empresa cliente tiene su propio esquema de PostgreSQL (`c<id>`), que se crea al
+darla de alta (`companies.create`, con [django-tenants](https://django-tenants.readthedocs.io/)).
+
+- **Esquema de la empresa** (`TENANT_APPS`: `orders`, `stock`, `apiOdoo`): sus tipos,
+  unidades, marcas, productos, direcciones de entrega, pedidos, documentos, compras y stock.
+- **Esquema central** (`public`): empresas, usuarios y roles, flota, conductores, viajes,
+  lugares de cargue, documentos del proceso de Hurgo y municipios.
+- Los steps de datos de empresa corren dentro de su esquema (`apps/companies/tenancy.py`:
+  `@in_company_schema()`). Un usuario de empresa solo entra al suyo; Hurgo indica
+  `company_id` (los ids se repiten entre esquemas) o, en listados, recorre todas.
+- Una parada del viaje guarda una copia de la dirección de entrega, porque la dirección
+  vive en el esquema de la empresa y el viaje en el central.
 
 ## Producción (VPS con Docker Compose)
 
@@ -47,15 +62,17 @@ Redis para caché, WebSockets y Celery).
 
 - `/static/` lo sirve Caddy (collectstatic).
 - `/media/` (remisiones, SOAT, documentos) solo se entrega con sesión iniciada:
-  Caddy pregunta a `/api/auth/session/status/` con las mismas cookies.
-- Al arrancar, `web` corre `migrate`, `collectstatic` y `seed_workflows`.
+  Caddy pregunta a `/api/auth/session/status/` con las mismas cookies. Por eso cada
+  archivo se guarda con una ruta que no se puede adivinar:
+  `<carpeta>/<esquema>/<año>/<mes>/<32 hex>-<nombre>` (`apps/companies/uploads.py`).
+- Al arrancar, `web` corre `migrate_schemas --shared` y `--tenant`, `collectstatic` y `seed_workflows`.
 
 ### Despliegue (el VPS baja de GitHub)
 
 En el VPS, `~/HurgoTrack/backend` es un clon de
 [hurgo-hub/HurgoTrack-Backend](https://github.com/hurgo-hub/HurgoTrack-Backend)
 (rama `main`). `deploy/update.sh` hace `git pull`, arma el core desde la
-etiqueta `vH0.1.0` y corre `docker compose build` + `up`. El `.env` y el
+etiqueta `vH0.1.1` y corre `docker compose build` + `up`. El `.env` y el
 `.env.backup` de esa carpeta están en `.gitignore`: git no los toca.
 
 El core es privado (`Dev-lopp/EngineDj`). El VPS lo baja a `~/HurgoTrack/enginedj`
@@ -76,7 +93,7 @@ Desplegar lo que está en GitHub (desde tu PC o en el VPS):
 subir: se despliega lo que está en `origin/main`, no tu carpeta.
 
 Lo desplegado queda en `~/HurgoTrack/backend/RELEASE`. Si moviste la etiqueta
-`vH0.1.0`, el paquete del core cambia y Docker lo reinstala.
+`vH0.1.1`, el paquete del core cambia y Docker lo reinstala.
 
 Primera vez en un servidor nuevo:
 
@@ -84,6 +101,25 @@ Primera vez en un servidor nuevo:
 git clone https://github.com/hurgo-hub/HurgoTrack-Backend.git ~/HurgoTrack/backend
 git clone git@github-enginedj:Dev-lopp/EngineDj.git ~/HurgoTrack/enginedj
 cd ~/HurgoTrack/backend && ./deploy/init-env.sh api.midominio.com https://app.midominio.com
+nano .env   # HURGO_COMPANY_NAME, HURGO_COMPANY_NIT y HURGO_COMPANY_DV (la empresa Hurgo)
+./deploy/update.sh
+docker compose exec web python manage.py createsuperuser
+```
+
+`seed_workflows` crea la empresa Hurgo (transportador, dueña de la flota) con esos
+datos del `.env`, o le actualiza el nombre. No aparece en "Empresas": ahí solo están
+las empresas cliente.
+
+Pasar un servidor que ya tenía datos a **un esquema por empresa** (una sola vez; las
+migraciones se rehicieron desde cero, así que la base arranca limpia):
+
+```bash
+cd ~/HurgoTrack/backend
+docker compose exec db pg_dump -U hurgotrack hurgotrack > antes-de-esquemas.sql   # respaldo
+docker compose stop web worker beat
+docker compose exec db dropdb -U hurgotrack hurgotrack
+docker compose exec db createdb -U hurgotrack hurgotrack
+nano .env   # agrega HURGO_COMPANY_NAME, HURGO_COMPANY_NIT y HURGO_COMPANY_DV
 ./deploy/update.sh
 docker compose exec web python manage.py createsuperuser
 ```
@@ -382,6 +418,9 @@ frontend puede refrescar el mapa seguido.
 
 ## Pruebas
 
+Corren sobre PostgreSQL (el `DATABASE_URL` del `.env`; el usuario necesita permiso
+`CREATEDB` para la base de pruebas). `build_world` crea los esquemas de las empresas de prueba.
+
 ```bash
-DATABASE_URL=sqlite:///test.sqlite3 python manage.py test apps
+python manage.py test apps
 ```

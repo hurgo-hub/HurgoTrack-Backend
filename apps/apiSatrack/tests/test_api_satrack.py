@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.fleet.models import M_vehicle, M_vehicle_gps
-from apps.testing import build_world, run_workflow
+from apps.testing import in_company, make_stop, build_world, run_workflow
 from apps.trips.models import M_trip, M_trip_line
 
 SATRACK = {
@@ -92,17 +92,16 @@ class ApiSatrackTests(APITestCase):
         cls.other_gps = M_vehicle.objects.create(plate="GPS001", **base)  # otro operador GPS
         M_vehicle_gps.objects.create(vehicle_id=cls.other_gps, operator="Otro GPS", username="x", password="y")
 
-        for address, (lat, lng) in ((cls.warehouse, ("10.463400", "-73.253200")),
-                                    (cls.dealer_addr, ("10.477000", "-73.250000"))):
-            address.latitude, address.longitude = Decimal(lat), Decimal(lng)
-            address.save()
+        cls.warehouse.latitude, cls.warehouse.longitude = Decimal("10.463400"), Decimal("-73.253200")
+        cls.warehouse.save()
+        with in_company(cls.uma):  # la dirección de entrega vive en el esquema de la empresa
+            cls.dealer_addr.latitude, cls.dealer_addr.longitude = Decimal("10.477000"), Decimal("-73.250000")
+            cls.dealer_addr.save()
         cls.trip = M_trip.objects.create(company_id=cls.uma, carrier_id=cls.hurgo, vehicle_id=cls.vehicle,
                                          driver_id=cls.driver, origin_address_id=cls.warehouse, state="in_route",
                                          departure_date=timezone.now() - timedelta(hours=1))
-        cls.stop1 = M_trip_line.objects.create(trip_id=cls.trip, sequence=1, recipient_id=cls.uma,
-                                               address_id=cls.dealer_addr, state="in_route")
-        cls.stop2 = M_trip_line.objects.create(trip_id=cls.trip, sequence=2, recipient_id=cls.uma,
-                                               address_id=cls.dealer2_addr)  # sin coordenadas
+        cls.stop1 = make_stop(cls.trip, 1, cls.dealer_addr, state="in_route")
+        cls.stop2 = make_stop(cls.trip, 2, cls.dealer2_addr)  # sin coordenadas
 
     def setUp(self):
         cache.clear()
@@ -240,8 +239,8 @@ class ApiSatrackTests(APITestCase):
         self.assertEqual(data["trips"][0]["state"], "in_route")
 
     def test_map_overview_hub_mode(self):
-        self.dealer2_addr.latitude, self.dealer2_addr.longitude = Decimal("10.5"), Decimal("-73.3")
-        self.dealer2_addr.save()
+        self.stop2.latitude, self.stop2.longitude = Decimal("10.5"), Decimal("-73.3")  # copia en la parada
+        self.stop2.save()
         with mock.patch(POST, side_effect=self.fake()):
             legs = self.ok(run_workflow(self.dispatch, "apiSatrack.map_overview"))["arcs"]
             hub = self.ok(run_workflow(self.dispatch, "apiSatrack.map_overview", {"arc_mode": "hub"}))["arcs"]

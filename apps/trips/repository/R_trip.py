@@ -7,7 +7,7 @@ from apps.trips.entity import E_trip
 from apps.trips.models import M_trip, M_trip_event, M_trip_line
 
 BUSY_STATES = ("assigned", "in_route", "delivering")
-LIST_RELATED = ("company_id", "brand_id", "vehicle_id", "driver_id__user_id", "origin_address_id", "parent_trip_id")
+LIST_RELATED = ("company_id", "vehicle_id", "driver_id__user_id", "origin_address_id", "parent_trip_id")
 
 
 class R_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_trip]):
@@ -88,7 +88,7 @@ class R_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_trip]):
         return qs.select_related(*LIST_RELATED).prefetch_related(
             Prefetch(
                 "trip_line_trip_id",
-                queryset=M_trip_line.objects.select_related("recipient_id", "address_id__location_id").prefetch_related(
+                queryset=M_trip_line.objects.select_related("recipient_id").prefetch_related(
                     "trip_line_serie_trip_line_id",
                     Prefetch(
                         "order_line_trip_trip_line_id",
@@ -107,5 +107,5 @@ class R_trip(InvalidateAppsMixin, BaseRepositoryImpl[E_trip]):
         qs = self.model.objects.filter(is_active=True, driver_id__user_id=user, state__in=BUSY_STATES)
         return self.with_list(qs).select_related("origin_address_id__location_id").prefetch_related(
             Prefetch("trip_line_trip_id",
-                     queryset=M_trip_line.objects.select_related("recipient_id", "address_id__location_id")),
+                     queryset=M_trip_line.objects.select_related("recipient_id")),
         ).order_by("planned_departure", "id")

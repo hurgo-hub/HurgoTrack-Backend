@@ -4,7 +4,7 @@ from enginedj.base.repository import BaseRepositoryImpl
 
 from enginedj.base.cache import InvalidateAppsMixin
 from apps.trips.entity import E_trip_line_serie
-from apps.trips.models import M_trip_line_serie
+from apps.orders.models import M_trip_line_serie
 
 
 class R_trip_line_serie(InvalidateAppsMixin, BaseRepositoryImpl[E_trip_line_serie]):

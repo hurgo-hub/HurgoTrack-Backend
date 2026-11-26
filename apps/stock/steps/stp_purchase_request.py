@@ -3,6 +3,8 @@
 from enginedj.base.steps.helpers import context_user, results, validate_input
 from enginedj.modules.registry import register_module
 
+from apps.companies.tenancy import for_each_company, in_company_schema
+
 from apps.stock.serializers import (
     Sz_link_purchase_in,
     Sz_purchase_request,
@@ -20,6 +22,7 @@ def _detail(user, request_id, **extra):
 
 
 @register_module("stock.purchase_request.create", important=True)
+@in_company_schema()
 def create_request(context, params, execution):
     """Hurgo pide la compra al facturador. lines: [{item_id, qty, order_line_id?}]."""
     user = context_user(context)
@@ -30,6 +33,7 @@ def create_request(context, params, execution):
 
 
 @register_module("stock.purchase_request.send", important=True)
+@in_company_schema()
 def send_request(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_request_id_in, context)
@@ -38,6 +42,7 @@ def send_request(context, params, execution):
 
 
 @register_module("stock.purchase_request.link_purchase", important=True)
+@in_company_schema()
 def link_purchase(context, params, execution):
     """El facturador registra la compra de Odoo (P000XX): sus líneas entran al stock de la empresa."""
     user = context_user(context)
@@ -47,6 +52,7 @@ def link_purchase(context, params, execution):
 
 
 @register_module("stock.purchase_request.cancel", important=True)
+@in_company_schema()
 def cancel_request(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_request_cancel_in, context)
@@ -55,6 +61,7 @@ def cancel_request(context, params, execution):
 
 
 @register_module("stock.purchase_request.retrieve", important=True)
+@in_company_schema()
 def retrieve_request(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_request_id_in, context)
@@ -62,8 +69,14 @@ def retrieve_request(context, params, execution):
 
 
 @register_module("stock.purchase_request.list", important=True)
+@in_company_schema(optional=True)
 def list_requests(context, params, execution):
+    """Solicitudes de una empresa o, para Hurgo sin company_id, las de todas (recorre sus esquemas)."""
+    user = context_user(context)
     data = validate_input(Sz_request_list_in, context)
-    rows = S_purchase_request().list_scoped(context_user(context), company_id=data.get("company_id"),
-                                            state=data.get("state"))
-    return results(Sz_purchase_request(rows, many=True).data)
+
+    def rows(company_id):
+        return Sz_purchase_request(S_purchase_request().list_scoped(user, company_id=company_id,
+                                                                    state=data.get("state")), many=True).data
+
+    return results(for_each_company(rows) if data.get("company_id") is None else rows(data["company_id"]))

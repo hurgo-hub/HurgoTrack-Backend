@@ -1,6 +1,7 @@
 from django.db import models
 
 from enginedj.base.models import M_model_base
+from apps.companies.uploads import PrivateUpload
 
 
 class M_soat(M_model_base, models.Model):
@@ -12,7 +13,7 @@ class M_soat(M_model_base, models.Model):
     policy_number = models.CharField(max_length=60, null=False, blank=False, help_text="policy del .mwb.")
     date_start = models.DateField(null=True, blank=True)
     date_expire = models.DateField(null=False, blank=False, db_index=True)
-    file = models.FileField(upload_to="fleet/soat/%Y/", null=True, blank=True)
+    file = models.FileField(upload_to=PrivateUpload("fleet/soat"), null=True, blank=True)
 
     def __str__(self):
         return f"SOAT {self.policy_number} - {self.vehicle_id}"
