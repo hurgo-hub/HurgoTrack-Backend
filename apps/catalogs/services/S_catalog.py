@@ -6,12 +6,12 @@ unidades, marcas ni documentos de una empresa.
 
 from django.apps import apps
 from django.db import IntegrityError, transaction
-from django.db.models import Q
 
 from enginedj.base.exceptions import BusinessError, BusinessNotFound, BusinessPermissionError
 from enginedj.base.services.permissions import has_perm, user_company_ids
 
 from apps.catalogs.registry import CATALOGS
+from apps.companies.tenancy import company_schema
 
 HURGO_PERM = "catalogs.manage_hurgo_catalogs"
 COMPANY_PERM = "catalogs.manage_company_catalogs"
@@ -42,9 +42,14 @@ class S_catalog:
             raise BusinessPermissionError("Solo puedes gestionar los catálogos de tu empresa.")
         return company_id
 
+    @staticmethod
+    def _is_company_user(user) -> bool:
+        """Pertenece a una empresa y gestiona sus catálogos (un superusuario de Hurgo no es usuario de empresa)."""
+        return has_perm(user, COMPANY_PERM) and bool(user_company_ids(user))
+
     def _require(self, user, catalog):
         if catalog.scope == "company":
-            if not has_perm(user, COMPANY_PERM):
+            if not self._is_company_user(user):
                 raise BusinessPermissionError("Este catálogo lo gestiona cada empresa.")
         elif not has_perm(user, HURGO_PERM):
             raise BusinessPermissionError("Este catálogo lo gestiona Hurgo.")
@@ -53,7 +58,7 @@ class S_catalog:
         """Catálogos que el usuario puede gestionar (para las pestañas)."""
         out = []
         for catalog in CATALOGS.values():
-            allowed = has_perm(user, COMPANY_PERM) if catalog.scope == "company" else has_perm(user, HURGO_PERM)
+            allowed = self._is_company_user(user) if catalog.scope == "company" else has_perm(user, HURGO_PERM)
             if allowed:
                 out.append({"key": catalog.key, "label": catalog.label, "scope": catalog.scope,
                             "fields": [self._field(name, kind) for name, kind in catalog.fields.items()]})
@@ -69,34 +74,34 @@ class S_catalog:
     def list(self, user, key, company_id=None):
         catalog, model = self._catalog(key)
         self._require(user, catalog)
-        qs = model.objects.all().order_by("name")
         if catalog.scope == "company":
             company = self._company_for(user, company_id)
-            own = Q(company_id=company)
-            qs = qs.filter(own | Q(company_id__isnull=True) if catalog.show_common else own)
-        elif catalog.common_only:
-            qs = qs.filter(company_id__isnull=True)
-        return [self._row(catalog, obj) for obj in qs]
+            with company_schema(company):  # viven en el esquema de la empresa
+                return [self._row(catalog, obj) for obj in model.objects.filter(company_id=company).order_by("name")]
+        return [self._row(catalog, obj) for obj in model.objects.all().order_by("name")]
 
     @staticmethod
     def _row(catalog, obj):
-        row = {"id": obj.pk, "name": obj.name, "is_active": obj.is_active}
-        if catalog.scope == "company":
-            # Registros de Hurgo que la empresa solo ve (ej. documentos del proceso)
-            row["read_only"] = obj.company_id_id is None
+        row = {"id": obj.pk, "name": obj.name, "is_active": obj.is_active, "read_only": False}
         for name in catalog.fields:
             row[name] = getattr(obj, name)
         return row
 
-    @transaction.atomic
     def save(self, user, key, data: dict):
         catalog, model = self._catalog(key)
         self._require(user, catalog)
+        if catalog.scope == "company":
+            company_id = self._company_for(user, data.get("company_id"))
+            with company_schema(company_id):
+                return self._save(user, catalog, model, data, company_id)
+        return self._save(user, catalog, model, data, None)
+
+    @transaction.atomic
+    def _save(self, user, catalog, model, data, company_id):
         name = (data.get("name") or "").strip()
         if not name:
             raise BusinessError("Indica el nombre.")
-        company_id = self._company_for(user, data.get("company_id")) if catalog.scope == "company" else None
-        owned = catalog.scope == "company" or catalog.common_only  # el modelo tiene company_id
+        owned = catalog.scope == "company"  # el modelo tiene company_id
 
         if data.get("id"):
             obj = model.objects.select_for_update().filter(pk=data["id"]).first()

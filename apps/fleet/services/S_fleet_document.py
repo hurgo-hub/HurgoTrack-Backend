@@ -6,6 +6,7 @@ from django.utils import timezone
 from enginedj.base.exceptions import BusinessError, BusinessNotFound
 from enginedj.base.services.permissions import require_perm
 
+from apps.companies.uploads import display_name
 from apps.fleet.models import M_driver_document, M_fleet_document_type, M_vehicle, M_vehicle_document
 
 PERM = "fleet.add_m_vehicle_document"
@@ -32,7 +33,7 @@ class S_fleet_document:
         docs = {}
         for d in model.objects.filter(**{field: owner}, is_active=True).order_by("-date_expire", "-id"):
             docs.setdefault(d.type_id_id, []).append(
-                {"id": d.id, "name": d.file.name.rsplit("/", 1)[-1], "date_expire": d.date_expire,
+                {"id": d.id, "name": display_name(d.file), "date_expire": d.date_expire,
                  "valid": d.date_expire is None or d.date_expire >= today})
         return [
             {"id": t.id, "name": t.name, "is_required": t.is_required, "has_expiration": t.has_expiration,

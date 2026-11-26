@@ -4,7 +4,8 @@ from django.core.validators import FileExtensionValidator
 from rest_framework import serializers
 
 from enginedj.base.serializers.sz_common import Sz_position_in, person
-from apps.trips.models import M_trip, M_trip_attach, M_trip_event, M_trip_line, M_trip_line_serie
+from apps.orders.models import M_trip_line_serie
+from apps.trips.models import M_trip, M_trip_attach, M_trip_event, M_trip_line
 
 ATTACH_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "heic", "heif", "pdf"]
 MAX_ATTACH_MB = 10
@@ -70,10 +71,11 @@ class Sz_trip_line(serializers.ModelSerializer):
         return {"id": obj.recipient_id_id, "name": obj.recipient_id.name}
 
     def get_address(self, obj):
-        a = obj.address_id
-        return {"id": a.id, "name": a.name, "address": a.address, "location": a.location_id.name,
-                "description": a.description, "contact_name": a.contact_name, "contact_phone": a.contact_phone,
-                "latitude": a.latitude, "longitude": a.longitude}
+        """Copia de la dirección guardada en la parada (la dirección vive en el esquema de la empresa)."""
+        return {"id": obj.address_ref, "name": obj.address_name, "address": obj.address_text,
+                "location": obj.location_name, "description": obj.address_description,
+                "contact_name": obj.contact_name, "contact_phone": obj.contact_phone,
+                "latitude": obj.latitude, "longitude": obj.longitude}
 
     def get_items(self, obj):
         return [
@@ -94,10 +96,10 @@ class Sz_trip_list(serializers.ModelSerializer):
     state_display = serializers.CharField(source="get_state_display", read_only=True)
     trip_type_display = serializers.CharField(source="get_trip_type_display", read_only=True)
     company = serializers.SerializerMethodField()
-    brand = serializers.CharField(source="brand_id.name", default=None, read_only=True)
+    brand = serializers.CharField(source="brand_name", read_only=True)
     vehicle = serializers.CharField(source="vehicle_id.plate", default=None, read_only=True)
     driver = serializers.SerializerMethodField()
-    origin_address = serializers.CharField(source="origin_address_id.name", read_only=True)
+    origin_address = serializers.CharField(source="origin_address_id.name", default=None, read_only=True)
     parent_trip = serializers.CharField(source="parent_trip_id.code", default=None, read_only=True)
 
     class Meta:
@@ -119,7 +121,7 @@ class Sz_trip_driver(Sz_trip_list):
     Espera las paradas precargadas (``R_trip.active_for_driver_user``).
     """
 
-    origin_location = serializers.CharField(source="origin_address_id.location_id.name", read_only=True)
+    origin_location = serializers.CharField(source="origin_address_id.location_id.name", default=None, read_only=True)
     destination = serializers.SerializerMethodField()
     stops_total = serializers.SerializerMethodField()
     stops_done = serializers.SerializerMethodField()
@@ -138,8 +140,7 @@ class Sz_trip_driver(Sz_trip_list):
         if not stops:
             return None
         last = stops[-1]
-        return {"recipient": last.recipient_id.name, "name": last.address_id.name,
-                "location": last.address_id.location_id.name}
+        return {"recipient": last.recipient_id.name, "name": last.address_name, "location": last.location_name}
 
     def get_stops_total(self, obj):
         return len(self._stops(obj))

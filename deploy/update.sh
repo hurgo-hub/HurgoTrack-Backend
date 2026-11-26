@@ -5,7 +5,7 @@
 #   BRANCH=sergio ~/HurgoTrack/backend/deploy/update.sh
 #
 # - Backend: git pull de hurgo-hub/HurgoTrack-Backend (esta carpeta es un clon).
-# - Core: arma EngineDj desde la etiqueta de requirements.txt (vH0.1.0) con la
+# - Core: arma EngineDj desde la etiqueta de requirements.txt (vH0.1.1) con la
 #   copia de ~/HurgoTrack/enginedj (repo privado; se baja con una deploy key de
 #   solo lectura). Si esa copia no está, usa el paquete que ya hay en vendor/.
 # - docker compose build + up. Las migraciones y seed_workflows corren al

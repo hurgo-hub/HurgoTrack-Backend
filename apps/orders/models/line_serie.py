@@ -4,7 +4,10 @@ from enginedj.base.models import M_model_base
 
 
 class M_trip_line_serie(M_model_base, models.Model):
-    """Una moto (unidad serializada) de una parada, identificada por su VIN."""
+    """Una moto (unidad serializada) de una parada, identificada por su VIN.
+
+    Vive en el esquema de la empresa (sus productos); apunta a la parada central del viaje.
+    """
 
     model_name = "trip_line_serie"
 

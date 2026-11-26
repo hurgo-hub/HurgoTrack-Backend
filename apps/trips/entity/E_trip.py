@@ -12,7 +12,7 @@ class E_trip(E_model_base):
         company_id: Optional[int | dict] = None,
         trip_type: Optional[str] = 'delivery',
         state: Optional[str] = 'draft',
-        brand_id: Optional[int | dict] = None,
+        brand_name: Optional[str] = '',
         carrier_id: Optional[int | dict] = None,
         vehicle_id: Optional[int | dict] = None,
         driver_id: Optional[int | dict] = None,
@@ -31,7 +31,7 @@ class E_trip(E_model_base):
         self.company_id = company_id or kwargs.get("company_id_id")
         self.trip_type = trip_type
         self.state = state
-        self.brand_id = brand_id or kwargs.get("brand_id_id")
+        self.brand_name = brand_name
         self.carrier_id = carrier_id or kwargs.get("carrier_id_id")
         self.vehicle_id = vehicle_id or kwargs.get("vehicle_id_id")
         self.driver_id = driver_id or kwargs.get("driver_id_id")

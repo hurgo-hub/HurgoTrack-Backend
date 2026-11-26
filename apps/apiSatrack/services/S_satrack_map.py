@@ -19,6 +19,17 @@ ROUTE_STATES = ("in_route", "delivering", "closed")  # viajes que ya salieron: t
 MAX_TRIPS = 200
 
 
+class _StopAddress:
+    """La parada guarda la copia de la dirección de entrega (la dirección vive en el esquema de la empresa)."""
+
+    def __init__(self, line):
+        self.pk = line.address_ref
+        self.name = line.address_name
+        self.address = line.address_text
+        self.latitude = line.latitude
+        self.longitude = line.longitude
+
+
 def _point(address) -> list[float] | None:
     if address is None or address.latitude is None or address.longitude is None:
         return None
@@ -63,14 +74,14 @@ class S_satrack_map:
             layers["origins"].append(_marker(origin_point, id=f"origin-{trip.pk}", trip_id=trip.pk,
                                              trip_code=trip.code, kind="origin", name=origin.name,
                                              address=origin.address))
-        else:
+        elif origin is not None:  # el viaje de regreso no tiene lugar de cargue de origen
             layers["missing_coordinates"].append({"trip_id": trip.pk, "kind": "origin", "address_id": origin.pk,
                                                   "name": origin.name})
 
         lines = sorted((line for line in trip.trip_line_trip_id.all() if line.is_active), key=lambda l: l.sequence)
-        previous_point, previous_name = origin_point, origin.name
+        previous_point, previous_name = origin_point, origin.name if origin else ""
         for line in lines:
-            address = line.address_id
+            address = _StopAddress(line)  # copia de la dirección guardada en la parada
             point = _point(address)
             if point is None:
                 layers["missing_coordinates"].append({"trip_id": trip.pk, "kind": "stop", "trip_line_id": line.pk,
@@ -81,7 +92,8 @@ class S_satrack_map:
                                            trip_line_id=line.pk, kind="stop", sequence=line.sequence,
                                            name=address.name, address=address.address, recipient=recipient,
                                            state=line.state, state_label=line.get_state_display()))
-            source, source_name = (origin_point, origin.name) if arc_mode == "hub" else (previous_point, previous_name)
+            source, source_name = ((origin_point, origin.name if origin else "") if arc_mode == "hub"
+                                   else (previous_point, previous_name))
             if source:
                 layers["arcs"].append({
                     "id": f"{trip.code}-{line.sequence}",
@@ -119,7 +131,7 @@ class S_satrack_map:
             qs.select_related("company_id", "vehicle_id__vehicle_gps_vehicle_id", "driver_id__user_id",
                               "origin_address_id")
             .prefetch_related(Prefetch("trip_line_trip_id",
-                                       queryset=M_trip_line.objects.select_related("recipient_id", "address_id")))
+                                       queryset=M_trip_line.objects.select_related("recipient_id")))
             .order_by("planned_departure", "id")[:MAX_TRIPS]
         )
         vehicles = {trip.vehicle_id_id: trip.vehicle_id for trip in trips if trip.vehicle_id_id}

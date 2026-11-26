@@ -6,7 +6,7 @@ import tempfile
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from apps.testing import build_world, proof_file, run_workflow
+from apps.testing import build_world, in_company, proof_file, run_workflow
 from apps.orders.models import M_order, M_order_line
 
 MEDIA_ROOT = tempfile.mkdtemp()
@@ -36,7 +36,9 @@ class OrderFlowTests(APITestCase):
         return run_workflow(user or self.commercial, "orders.create", self.payload(**overrides))
 
     def confirm(self, order_id, odoo="PO-001", user=None):
-        return run_workflow(user or self.dispatch, "orders.confirm", {"order_id": order_id, "odoo_purchase": odoo})
+        # Hurgo indica la empresa del pedido (los ids se repiten entre esquemas de empresa)
+        return run_workflow(user or self.dispatch, "orders.confirm",
+                            {"order_id": order_id, "odoo_purchase": odoo, "company_id": self.uma.id})
 
     def ok(self, result):
         self.assertTrue(result.ok, result.reason)
@@ -65,27 +67,28 @@ class OrderFlowTests(APITestCase):
                          sorted([self.dealer_addr.id, self.dealer2_addr.id]))
 
     def test_who_can_create(self):
-        self.assertIn("No puedes crear pedidos para esa empresa", self.create(company_id=self.akt.id).reason)
+        self.assertIn("Solo puedes acceder a los datos de tu empresa", self.create(company_id=self.akt.id).reason)
         self.assertIn("Permisos faltantes", self.create(user=self.driver_user).reason)
         self.assertIn("Indica la empresa", self.create(user=self.dispatch).reason)
         self.ok(self.create(user=self.dispatch, company_id=self.uma.id))
-        self.assertIn("no está registrada como empresa cliente",
+        self.assertIn("no tiene esquema de datos",  # Hurgo no es empresa cliente: no tiene esquema
                       self.create(user=self.dispatch, company_id=self.hurgo.id).reason)
 
     def test_line_and_address_validations(self):
         cases = {
-            "es de otra empresa": self.payload(lines=[self.line(self.akt_item, 1)]),
+            "no existe o es de otra empresa": self.payload(lines=[{**self.line(self.moto, 1), "item_id": 9999}]),
             "repetido": self.payload(lines=[self.line(self.moto, 1), self.line(self.moto, 2)]),
             "unidades enteras": self.payload(lines=[self.line(self.moto, "1.5")]),
-            "no es de UMA": self.payload(lines=[self.line(self.moto, 1, address=self.akt_addr)]),
-            "dirección de cargue no pertenece": self.payload(address_id=self.akt_addr.id),
+            "La dirección 9999 no existe": self.payload(lines=[{**self.line(self.moto, 1), "address_id": 9999}]),
+            "El lugar de cargue no existe": self.payload(address_id=9999),
             "lines": self.payload(lines=[]),
         }
         for expected, data in cases.items():
             result = run_workflow(self.commercial, "orders.create", data)
             self.assertFalse(result.ok, expected)
             self.assertIn(expected, result.reason)
-        self.assertEqual(M_order.objects.filter(company_id=self.uma).count(), 3)  # solo los del escenario
+        with in_company(self.uma):
+            self.assertEqual(M_order.objects.count(), 3)  # solo los del escenario
 
     def test_draft_submit_and_edit_until_confirmed(self):
         order = self.ok(self.create(submit=False))
@@ -109,7 +112,8 @@ class OrderFlowTests(APITestCase):
         self.assertIn("Permisos faltantes", self.confirm(order["id"], user=self.commercial).reason)
         for odoo in ("", "   "):  # sin stock (motos): la compra de Odoo sigue siendo obligatoria
             self.assertIn("referencia de la compra en Odoo", self.confirm(order["id"], odoo=odoo).reason)
-        self.assertEqual(M_order.objects.get(pk=order["id"]).state, "requested")
+        with in_company(self.uma):
+            self.assertEqual(M_order.objects.get(pk=order["id"]).state, "requested")
 
     def test_cancel_rules(self):
         order = self.ok(self.create())
@@ -117,7 +121,7 @@ class OrderFlowTests(APITestCase):
         self.assertEqual(order["state"], "cancelled")
         self.assertTrue(all(line["state"] == "cancelled" for line in order["lines"]))
 
-        payload = {"order_id": self.order1.id, "reason": "Sin stock"}
+        payload = {"order_id": self.order1.id, "reason": "Sin stock", "company_id": self.uma.id}
         self.assertIn("solo lo cancela el equipo de despacho", run_workflow(self.commercial, "orders.cancel", payload).reason)
         trip = self.ok(run_workflow(self.dispatch, "trips.build", {
             "company_id": self.uma.id, "origin_address_id": self.warehouse.id,
@@ -141,7 +145,7 @@ class OrderFlowTests(APITestCase):
         self.assertEqual({i["name"] for i in items}, {"UMA 125", "Otra 150", "Cemento"})
         # Las direcciones de entrega son las de su propia empresa
         addresses = self.ok(run_workflow(self.commercial, "locations.addresses"))
-        self.assertEqual({a["id"] for a in addresses}, {self.warehouse.id, self.dealer_addr.id, self.dealer2_addr.id})
+        self.assertEqual({a["id"] for a in addresses}, {self.dealer_addr.id, self.dealer2_addr.id})
         self.assertFalse(run_workflow(self.commercial, "locations.addresses", {"company_id": self.akt.id}).ok)
         self.assertIn("Permisos faltantes", run_workflow(self.driver_user, "locations.addresses").reason)
 
@@ -149,7 +153,8 @@ class OrderFlowTests(APITestCase):
         """Pedido -> confirmación -> viaje -> entrega: el cliente ve todo en el historial del pedido."""
         order = self.ok(self.create(lines=[self.line(self.cement, 10)]))
         self.ok(self.confirm(order["id"]))
-        line_id = M_order_line.objects.get(order_id=order["id"]).id
+        with in_company(self.uma):
+            line_id = M_order_line.objects.get(order_id=order["id"]).id
         trip = self.ok(run_workflow(self.dispatch, "trips.build", {
             "company_id": self.uma.id, "origin_address_id": self.warehouse.id,
             "allocations": [{"order_line_id": line_id, "qty": "10"}],

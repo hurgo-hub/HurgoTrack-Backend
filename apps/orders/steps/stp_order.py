@@ -2,6 +2,8 @@
 
 from enginedj.modules.registry import register_module
 
+from apps.companies.tenancy import in_company_schema
+
 from enginedj.base.steps.helpers import context_user, results, validate_input
 from apps.orders.serializers import (
     Sz_cancel_in,
@@ -20,6 +22,7 @@ def _detail(user, order_id):
 
 
 @register_module("orders.create", important=True)
+@in_company_schema()
 def create_order(context, params, execution):
     """Paso 1: el comercial crea el pedido. "submit": false lo deja en borrador."""
     user = context_user(context)
@@ -32,6 +35,7 @@ def create_order(context, params, execution):
 
 
 @register_module("orders.update", important=True)
+@in_company_schema()
 def update_order(context, params, execution):
     """Reemplaza dirección de cargue y productos mientras no esté confirmado."""
     user = context_user(context)
@@ -42,6 +46,7 @@ def update_order(context, params, execution):
 
 
 @register_module("orders.submit", important=True)
+@in_company_schema()
 def submit_order(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_order_id_in, context)
@@ -50,6 +55,7 @@ def submit_order(context, params, execution):
 
 
 @register_module("orders.confirm", important=True)
+@in_company_schema()
 def confirm_order(context, params, execution):
     """Paso 2: despacho confirma la compra en Odoo."""
     user = context_user(context)
@@ -60,6 +66,7 @@ def confirm_order(context, params, execution):
 
 
 @register_module("orders.cancel", important=True)
+@in_company_schema()
 def cancel_order(context, params, execution):
     user = context_user(context)
     data = validate_input(Sz_cancel_in, context)
@@ -68,6 +75,7 @@ def cancel_order(context, params, execution):
 
 
 @register_module("orders.retrieve", important=True)
+@in_company_schema()
 def retrieve_order(context, params, execution):
     """Detalle con líneas, viajes en que va cada una e historial."""
     user = context_user(context)
@@ -76,12 +84,19 @@ def retrieve_order(context, params, execution):
 
 
 @register_module("orders.list", important=True)
+@in_company_schema(optional=True)
 def list_orders(context, params, execution):
-    """Igual que list.relations (data: fields, relations, filters...), limitado a las empresas del usuario."""
-    return results(S_order().list_scoped(context_user(context), context.get("data") or {}))
+    """Igual que list.relations (data: fields, relations, filters...). Usuario de empresa: los suyos.
+    Hurgo: los de una empresa (company_id) o, sin company_id, los de todas (con ``company_id`` en cada fila)."""
+    user = context_user(context)
+    data = context.get("data") or {}
+    if context.get("company_id") is None:
+        return results(S_order().list_all_companies(user, data))
+    return results(S_order().list_scoped(user, data))
 
 
 @register_module("orders.set_loading_point", important=True)
+@in_company_schema()
 def set_loading_point(context, params, execution):
     """Hurgo elige el lugar de cargue del pedido (uno por viaje)."""
     user = context_user(context)

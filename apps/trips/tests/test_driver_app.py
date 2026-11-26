@@ -7,7 +7,7 @@ from django.test import override_settings
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
 
-from apps.testing import PASSWORD, build_world
+from apps.testing import make_stop, PASSWORD, build_world
 from apps.trips.models import M_trip, M_trip_line
 
 
@@ -17,10 +17,8 @@ class DriverAppTests(APITestCase):
         build_world(cls)
         cls.trip = M_trip.objects.create(company_id=cls.uma, carrier_id=cls.hurgo, vehicle_id=cls.vehicle,
                                          driver_id=cls.driver, origin_address_id=cls.warehouse, state="assigned")
-        M_trip_line.objects.create(trip_id=cls.trip, sequence=1, recipient_id=cls.uma, address_id=cls.dealer_addr,
-                                   qty=Decimal("3"), state="delivered")
-        M_trip_line.objects.create(trip_id=cls.trip, sequence=2, recipient_id=cls.uma,
-                                   address_id=cls.dealer2_addr, qty=Decimal("2"))
+        make_stop(cls.trip, 1, cls.dealer_addr, qty=Decimal("3"), state="delivered")
+        make_stop(cls.trip, 2, cls.dealer2_addr, qty=Decimal("2"))
 
     def login(self):
         client = APIClient()

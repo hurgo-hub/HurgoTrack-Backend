@@ -21,7 +21,7 @@ from enginedj.base.exceptions import BusinessError, BusinessNotFound, BusinessPe
 from enginedj.base.services.permissions import has_perm, require_perm, user_company_ids
 from apps.locations.repository import R_address
 from apps.orders.entity import E_order
-from apps.orders.models import M_order_line
+from apps.orders.models import M_company_address, M_order_line
 from apps.orders.repository import R_item, R_order, R_order_event, R_order_line
 
 EDITABLE_STATES = ("draft", "requested")
@@ -97,16 +97,13 @@ class S_order(BaseService[E_order]):
         return company
 
     def _resolve_origin(self, company, address_id):
-        """Lugar de cargue: opcional (Hurgo lo puede elegir después). Vale una dirección de la empresa
-        del pedido o un lugar de cargue registrado por Hurgo (planta, bodega, proveedor)."""
+        """Lugar de cargue: opcional (lo elige Hurgo al gestionar el pedido). Es un lugar de cargue
+        registrado por Hurgo (central: planta, bodega, proveedor)."""
         if address_id is None:
             return None
         address = self.r_address.get_active(address_id)
         if address is None:
-            raise BusinessNotFound("La dirección de cargue no existe.")
-        if address.company_id_id != company.pk and not address.is_loading_point:
-            raise BusinessError("La dirección de cargue no pertenece a la empresa del pedido ni es un lugar de "
-                                "cargue registrado.", code="address_mismatch")
+            raise BusinessNotFound("El lugar de cargue no existe.")
         return address
 
     def _build_lines(self, order, user, lines) -> list[M_order_line]:
@@ -120,7 +117,8 @@ class S_order(BaseService[E_order]):
                 raise BusinessError(f"El producto {line['item_id']} no existe o es de otra empresa.",
                                     code="invalid_item")
             # La dirección de entrega es siempre de la empresa que pide (ella guarda sus direcciones)
-            address = self.r_address.get_active(line["address_id"])
+            # Dirección de entrega: de la empresa, en su esquema (el step ya está en él)
+            address = M_company_address.objects.filter(pk=line["address_id"], is_active=True).first()
             if address is None:
                 raise BusinessNotFound(f"La dirección {line['address_id']} no existe.")
             if address.company_id_id != order.company_id_id:
@@ -234,8 +232,6 @@ class S_order(BaseService[E_order]):
         address = self.r_address.get_active(address_id)
         if address is None:
             raise BusinessNotFound("El lugar de cargue no existe.")
-        if not address.is_loading_point and address.company_id_id != order.company_id_id:
-            raise BusinessError(f"'{address.name}' no es un lugar de cargue registrado.", code="not_loading_point")
         order.address_id = address
         self.repository.save_order(order, user)
         self.r_event.register(order, user, "Lugar de cargue asignado", description=str(address))
@@ -276,7 +272,9 @@ class S_order(BaseService[E_order]):
             if new_state == "delivered" and settings.ODOO_ENABLED:
                 from apps.apiOdoo.tasks import notify_order_delivered
 
-                transaction.on_commit(lambda pk=order.pk: notify_order_delivered.delay(pk), robust=True)
+                transaction.on_commit(
+                    lambda pk=order.pk, company=order.company_id_id: notify_order_delivered.delay(pk, company),
+                    robust=True)
 
     # ------------------------------------------------------------------
     # Lectura
@@ -288,6 +286,24 @@ class S_order(BaseService[E_order]):
         if order is None:
             raise BusinessNotFound("El pedido no existe.")
         return order
+
+    def list_all_companies(self, user, data: dict):
+        """Hurgo: pedidos de todas las empresas (recorre el esquema de cada una)."""
+        from enginedj.base.models import M_company
+
+        from apps.companies.tenancy import for_each_company
+
+        require_perm(user, "orders.view_all_order", "No tienes permiso para ver pedidos de todas las empresas.")
+
+        names = dict(M_company.objects.filter(is_client=True).values_list("id", "name"))
+
+        def rows(company_id):
+            out = self.list_scoped(user, dict(data))
+            for row in out:
+                row["company_id"], row["company"] = company_id, names.get(company_id, "")
+            return out
+
+        return for_each_company(rows)
 
     def list_scoped(self, user, data: dict):
         """Como ``list.relations`` del motor, limitado a las empresas que el usuario puede ver."""

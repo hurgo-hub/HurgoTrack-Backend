@@ -28,7 +28,7 @@ class M_order(M_model_base, models.Model):
                                    help_text="Empresa cliente que pide.")
     address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=True, blank=True,
                                    related_name="order_address_id", db_column="address_id",
-                                   help_text="Lugar de cargue. Lo puede indicar el cliente o elegirlo Hurgo "
+                                   help_text="Lugar de cargue (central, registrado por Hurgo); lo elige Hurgo "
                                              "al gestionar el pedido (orders.set_loading_point).")
     order_date = models.DateField(null=False, blank=False, help_text="date del .mwb.")
     state = models.CharField(max_length=15, null=False, blank=False, choices=state_choices, default="requested",

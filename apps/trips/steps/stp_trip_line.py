@@ -1,5 +1,7 @@
 from enginedj.modules.registry import register_module
 
+from apps.companies.tenancy import in_company_schema, trip_company
+
 from enginedj.base.exceptions import BusinessError
 from enginedj.base.steps.helpers import context_files, context_user, validate_files, validate_input
 from apps.trips.serializers import Sz_deliver_in, Sz_return_in, Sz_stop_position_in, validate_attach
@@ -8,6 +10,7 @@ from apps.trips.steps.stp_trip import trip_detail
 
 
 @register_module("trips.start_delivery", important=True)
+@in_company_schema(company_from=trip_company)
 def start_delivery(context, params, execution):
     """Paso 5: el conductor llega a la parada (en reparto)."""
     user = context_user(context)
@@ -18,6 +21,7 @@ def start_delivery(context, params, execution):
 
 
 @register_module("trips.deliver", important=True)
+@in_company_schema(company_from=trip_company)
 def deliver(context, params, execution):
     """Paso 7: entrega con la foto de la remisión firmada (multipart, primer archivo de "files")."""
     user = context_user(context)
@@ -32,6 +36,7 @@ def deliver(context, params, execution):
 
 
 @register_module("trips.register_return", important=True)
+@in_company_schema(company_from=trip_company)
 def register_return(context, params, execution):
     """Devolución de la parada completa (fotos opcionales en "files")."""
     user = context_user(context)

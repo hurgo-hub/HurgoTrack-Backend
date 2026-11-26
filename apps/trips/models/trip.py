@@ -32,9 +32,8 @@ class M_trip(M_model_base, models.Model):
     trip_type = models.CharField(max_length=10, null=False, blank=False, choices=trip_type_choices, default="delivery")
     state = models.CharField(max_length=15, null=False, blank=False, choices=state_choices, default="draft",
                              db_index=True)
-    brand_id = models.ForeignKey("orders.M_brand", on_delete=models.PROTECT, null=True, blank=True,
-                                 related_name="trip_brand_id", db_column="brand_id",
-                                 help_text="Marca única del viaje cuando lleva motos.")
+    brand_name = models.CharField(max_length=120, null=False, blank=True, default="",
+                                  help_text="Marca única del viaje cuando lleva motos (la marca es de la empresa).")
     carrier_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=True, blank=True,
                                    related_name="trip_carrier_id", db_column="carrier_id",
                                    help_text="Transportador que hace el viaje.")
@@ -42,9 +41,9 @@ class M_trip(M_model_base, models.Model):
                                    related_name="trip_vehicle_id", db_column="vehicle_id")
     driver_id = models.ForeignKey("drivers.M_driver", on_delete=models.PROTECT, null=True, blank=True,
                                   related_name="trip_driver_id", db_column="driver_id")
-    origin_address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=False, blank=False,
+    origin_address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=True, blank=True,
                                           related_name="trip_origin_address_id", db_column="origin_address_id",
-                                          help_text="address_id del .mwb: bodega de cargue.")
+                                          help_text="address_id del .mwb: lugar de cargue (registrado por Hurgo).")
     parent_trip_id = models.ForeignKey("trips.M_trip", on_delete=models.PROTECT, null=True, blank=True,
                                        related_name="trip_parent_trip_id", db_column="parent_trip_id",
                                        help_text="trip_id del .mwb: viaje original de un viaje de regreso.")

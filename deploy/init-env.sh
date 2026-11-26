@@ -42,6 +42,11 @@ REDIS_URL=redis://redis:6379
 CACHE_PREFIX=hurgotrack
 FIELD_ENCRYPTION_KEY=$FERNET_KEY
 
+# Empresa Hurgo (transportador, dueña de la flota). seed_workflows la crea al arrancar.
+HURGO_COMPANY_NAME=
+HURGO_COMPANY_NIT=
+HURGO_COMPANY_DV=
+
 # Satrack (mapa / GPS)
 SATRACK_ENABLED=False
 SATRACK_CLIENT_ID=

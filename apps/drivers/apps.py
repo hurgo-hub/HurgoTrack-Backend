@@ -6,3 +6,7 @@ class DriversConfig(AppConfig):
     name = "apps.drivers"
     label = "drivers"
     verbose_name = "Conductores"
+
+    def ready(self):
+        # Importar los steps para registrarlos en el motor
+        import apps.drivers.steps.stp_driver  # noqa: F401

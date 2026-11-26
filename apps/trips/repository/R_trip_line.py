@@ -22,8 +22,14 @@ class R_trip_line(InvalidateAppsMixin, BaseRepositoryImpl[E_trip_line]):
         self._invalidate_list_cache()
         return stop
 
+    def create_stop_from(self, stop: M_trip_line) -> M_trip_line:
+        stop.save()
+        self._invalidate_list_cache()
+        return stop
+
     def stops_by_destination(self, trip) -> dict:
-        return {(s.recipient_id_id, s.address_id_id): s for s in self.model.objects.filter(trip_id=trip)}
+        """Paradas por (destinatario, dirección de entrega en el esquema de la empresa)."""
+        return {(s.recipient_id_id, s.address_ref): s for s in self.model.objects.filter(trip_id=trip)}
 
     def save_stop(self, stop: M_trip_line, user):
         stop.update_user = user

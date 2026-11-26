@@ -8,29 +8,23 @@ SYSTEM_KEYS = {"delivery_proof", "novelty", "return", "loading"}
 
 
 class M_trip_type_attach(M_catalog_base, models.Model):
-    """Tipo de documento / adjunto y la etapa del proceso en que se pide.
+    """Documento del proceso de Hurgo (remisión, foto de cargue...) y la etapa en que se pide.
 
-    - ``company_id`` nulo: lo define Hurgo y aplica a todas las empresas. Con empresa: lo pide
-      esa empresa en sus solicitudes.
-    - ``stage``: ``order`` (al crear/confirmar el pedido), ``loading`` (al cargar, antes de salir),
-      ``delivery`` (al entregar), ``return`` (devolución), ``novelty`` (novedad).
-    - ``is_required``: sin él no se puede pasar esa etapa (confirmar, salir o entregar).
+    Los documentos que exige cada empresa viven en su esquema (``orders.M_document_type``).
+    - ``stage``: ``loading`` (al cargar, antes de salir), ``delivery`` (al entregar),
+      ``return`` (devolución), ``novelty`` (novedad).
+    - ``is_required``: sin él no se puede pasar esa etapa (salir o entregar).
     """
 
     model_name = "trip_type_attach"
 
     stage_choices = [
-        ("order", "Pedido"),
         ("loading", "Cargue"),
         ("delivery", "Entrega"),
         ("return", "Devolución"),
         ("novelty", "Novedad"),
     ]
 
-    name = models.CharField(max_length=120, null=False, blank=False)
-    company_id = models.ForeignKey("base.M_company", on_delete=models.CASCADE, null=True, blank=True,
-                                   related_name="trip_type_attach_company_id", db_column="company_id",
-                                   help_text="Empresa que lo exige; vacío = de Hurgo (todas).")
     key = models.SlugField(max_length=60, null=False, blank=False, unique=True,
                            help_text="Clave única; la de los de sistema la usa el código, ej. delivery_proof.")
     stage = models.CharField(max_length=10, null=False, blank=False, choices=stage_choices, default="delivery",
@@ -45,7 +39,7 @@ class M_trip_type_attach(M_catalog_base, models.Model):
 
     def save(self, *args, **kwargs):
         if not self.key:
-            base = slugify(f"{self.company_id_id or 'hurgo'}-{self.name}")[:50] or "doc"
+            base = slugify(f"hurgo-{self.name}")[:50] or "doc"
             key, n = base, 1
             while M_trip_type_attach.objects.filter(key=key).exclude(pk=self.pk).exists():
                 n += 1
@@ -55,8 +49,3 @@ class M_trip_type_attach(M_catalog_base, models.Model):
 
     class Meta(M_catalog_base.Meta):
         db_table = "trip_type_attach"
-        constraints = [
-            models.UniqueConstraint(fields=["company_id", "name"], name="uq_trip_type_attach_company_name"),
-            models.UniqueConstraint(fields=["name"], condition=models.Q(company_id__isnull=True),
-                                    name="uq_trip_type_attach_common_name"),
-        ]

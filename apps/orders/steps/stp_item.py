@@ -1,11 +1,14 @@
 from enginedj.modules.registry import register_module
 
+from apps.companies.tenancy import in_company_schema
+
 from enginedj.base.steps.helpers import context_user, results, validate_input
 from apps.orders.serializers import Sz_company_items_in, Sz_item, Sz_item_in, Sz_item_lookup, Sz_lookup_in
 from apps.orders.services import S_item, S_order
 
 
 @register_module("orders.items", important=True)
+@in_company_schema()
 def items_lookup(context, params, execution):
     """Productos que el usuario puede pedir. Filtros opcionales: company_id, q."""
     data = validate_input(Sz_lookup_in, context)
@@ -14,6 +17,7 @@ def items_lookup(context, params, execution):
 
 
 @register_module("orders.company_items", important=True)
+@in_company_schema()
 def company_items(context, params, execution):
     """Catálogo completo (activos e inactivos) de una empresa, para gestionarlo."""
     data = validate_input(Sz_company_items_in, context)
@@ -21,6 +25,7 @@ def company_items(context, params, execution):
 
 
 @register_module("orders.item.save", important=True)
+@in_company_schema()
 def save_item(context, params, execution):
     """Crea (sin item_id) o edita un producto de la empresa."""
     data = validate_input(Sz_item_in, context)

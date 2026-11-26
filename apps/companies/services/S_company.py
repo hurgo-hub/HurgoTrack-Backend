@@ -70,15 +70,22 @@ class S_company:
             verification_digit=company.get("verification_digit") or "", email=company.get("email") or "",
             phone=company.get("phone") or "", is_client=True, create_user=user,
         )
+        # Su propio esquema de PostgreSQL (aislamiento): ahí van sus catálogos, productos, pedidos...
+        from apps.companies.tenancy import create_company_schema
+
+        create_company_schema(new)
         admin_user = None
         if admin:
             admin_user = self._create_user(new, {**admin, "role": COMPANY_ADMIN_ROLE}, user)
+        new.admins = [admin_user.username] if admin_user else []  # como en list()
         return new, admin_user
 
     @transaction.atomic
     def update(self, user, company_id, data: dict):
         require_perm(user, "companies.create_company", "Solo administración de Hurgo edita empresas.")
         company = self._company(company_id)
+        if not company.is_client:
+            raise BusinessError("La empresa Hurgo se configura en el .env del servidor.", code="not_client")
         number = (data.get("document_number") or company.document_number).strip()
         if M_company.objects.filter(document_number=number).exclude(pk=company.pk).exists():
             raise BusinessError(f"Ya existe una empresa con el NIT {number}.", code="duplicate_company")
@@ -93,7 +100,8 @@ class S_company:
 
     def list(self, user):
         require_perm(user, "companies.create_company", "Solo administración de Hurgo ve todas las empresas.")
-        companies = list(M_company.objects.order_by("name"))
+        # Solo clientes: la empresa Hurgo (transportador) se configura en el .env (ver companies/seeds.py)
+        companies = list(M_company.objects.filter(is_client=True).order_by("name"))
         admins = {}
         for link in M_user_company.objects.filter(
             is_active=True, user_id__groups__name=COMPANY_ADMIN_ROLE
@@ -113,7 +121,12 @@ class S_company:
         if not has_perm(user, "companies.manage_company"):
             raise BusinessPermissionError("No administras ninguna empresa.")
         companies = M_company.objects.filter(pk__in=user_company_ids(user), is_active=True).order_by("name")
-        types = M_type_item.objects.filter(company_id__in=[c.pk for c in companies], is_active=True).order_by("name")
+        types = []
+        if companies:  # los tipos viven en el esquema de la empresa
+            from apps.companies.tenancy import company_schema
+
+            with company_schema(companies[0].pk):
+                types = list(M_type_item.objects.filter(is_active=True).order_by("name"))
         return {
             "companies": [{"id": c.id, "name": c.name, "is_client": c.is_client} for c in companies],
             "type_items": [{"id": t.id, "name": t.name, "uses_stock": t.uses_stock} for t in types],

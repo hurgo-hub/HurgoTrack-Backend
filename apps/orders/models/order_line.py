@@ -31,7 +31,7 @@ class M_order_line(M_model_base, models.Model):
     recipient_id = models.ForeignKey("base.M_company", on_delete=models.PROTECT, null=False, blank=False,
                                      related_name="order_line_recipient_id", db_column="recipient_id",
                                      help_text="Empresa que pide (dueña de la dirección de entrega); lo pone el sistema.")
-    address_id = models.ForeignKey("locations.M_address", on_delete=models.PROTECT, null=False, blank=False,
+    address_id = models.ForeignKey("orders.M_company_address", on_delete=models.PROTECT, null=False, blank=False,
                                    related_name="order_line_address_id", db_column="address_id",
                                    help_text="Dirección de entrega.")
     qty = models.DecimalField(max_digits=12, decimal_places=2, null=False, blank=False,

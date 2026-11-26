@@ -14,10 +14,13 @@ logger = logging.getLogger(__name__)
     retry_backoff=True,
     max_retries=5,
 )
-def notify_order_delivered(order_id: int) -> dict:
-    """Al quedar entregado un pedido, deja la nota de entrega en la compra de Odoo (reintenta si Odoo no responde)."""
+def notify_order_delivered(order_id: int, company_id: int) -> dict:
+    """Al quedar entregado un pedido, deja la nota de entrega en la compra de Odoo (reintenta si Odoo no responde).
+    El pedido vive en el esquema de su empresa."""
     from apps.apiOdoo.services import S_odoo_sync
+    from apps.companies.tenancy import company_schema
 
-    result = S_odoo_sync().notify_delivery(order_id)
+    with company_schema(company_id):
+        result = S_odoo_sync().notify_delivery(order_id)
     logger.info("Entrega del pedido %s notificada a Odoo (%s)", result["order"], result["purchase"])
     return result

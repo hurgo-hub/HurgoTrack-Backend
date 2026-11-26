@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.locations.models import M_address, M_loading_tag
+from apps.orders.models import M_company_address
 
 
 class Sz_loading_tag(serializers.ModelSerializer):
@@ -40,6 +41,8 @@ class Sz_loading_points_in(serializers.Serializer):
     item_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
     order_id = serializers.IntegerField(required=False, allow_null=True,
                                         help_text="Sugiere los lugares con etiquetas de los productos del pedido.")
+    order_company_id = serializers.IntegerField(required=False, allow_null=True,
+                                                help_text="Empresa del pedido (para leer sus productos).")
     q = serializers.CharField(required=False, allow_blank=True, default="")
 
 
@@ -70,9 +73,9 @@ class Sz_company_address(serializers.ModelSerializer):
     location = serializers.CharField(source="location_id.name", read_only=True)
 
     class Meta:
-        model = M_address
+        model = M_company_address
         fields = ["id", "company_id", "name", "address", "description", "location_id", "location", "contact_name",
-                  "contact_phone", "is_loading_point", "is_active"]
+                  "contact_phone", "latitude", "longitude", "is_active"]
 
 
 class Sz_company_address_in(serializers.Serializer):
