@@ -63,6 +63,9 @@ class S_trip_line(BaseService[E_trip_line]):
         """Paso 7: solo el conductor confirma, siempre con la foto de la remisión firmada. Sin entregas parciales."""
         trip, stop = self._open_stop(user, trip_id, trip_line_id, "entregar")
         self._require_open(stop)
+        from apps.trips.services.S_document import require_delivery_documents
+
+        require_delivery_documents(trip, stop)
         if not proof:
             raise BusinessError("La entrega se confirma con la foto de la remisión firmada.", code="missing_proof")
         s_attach = S_trip_attach()

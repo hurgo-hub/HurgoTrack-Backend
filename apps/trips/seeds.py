@@ -1,11 +1,11 @@
 """Tipos de adjunto, permisos y workflows de viajes (pasos 3 a 8). Ver ``manage.py seed_workflows``."""
 
 ATTACH_TYPES = [
-    # key, nombre, es prueba de entrega
-    ("delivery_proof", "Remisión firmada", True),
-    ("novelty", "Foto de novedad", False),
-    ("return", "Soporte de devolución", False),
-    ("loading", "Foto de cargue", False),
+    # key, nombre, es prueba de entrega, etapa
+    ("delivery_proof", "Remisión firmada", True, "delivery"),
+    ("novelty", "Foto de novedad", False, "novelty"),
+    ("return", "Soporte de devolución", False, "return"),
+    ("loading", "Foto de cargue", False, "loading"),
 ]
 
 ROLES = {
@@ -39,14 +39,17 @@ WORKFLOWS = {
     "trips.report_novelty": ["trips.report_novelty_trip"],
     "trips.retrieve": ["trips.view_m_trip"],
     "trips.list": ["trips.view_m_trip"],
+    # Documentos requeridos (el servicio valida quién puede subir: despacho o el conductor asignado)
+    "trips.documents": ["trips.view_m_trip"],
+    "trips.attach": ["trips.view_m_trip"],
 }
 
 
 def seed(stdout):
     from apps.trips.models import M_trip_type_attach
 
-    for key, name, is_proof in ATTACH_TYPES:
+    for key, name, is_proof, stage in ATTACH_TYPES:
         M_trip_type_attach.objects.update_or_create(
-            key=key, defaults={"name": name, "is_delivery_proof": is_proof, "is_active": True}
+            key=key, defaults={"name": name, "is_delivery_proof": is_proof, "stage": stage, "is_active": True}
         )
     stdout.write(f"Tipos de adjunto de viaje: {len(ATTACH_TYPES)}")

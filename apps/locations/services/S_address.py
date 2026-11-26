@@ -157,10 +157,15 @@ class S_address(BaseService[E_address]):
 
     @transaction.atomic
     def save_company_address(self, user, data: dict):
-        """Crea o edita una dirección de la empresa (entrega, bodega, sede)."""
-        if not (self._is_hurgo(user) or has_perm(user, "locations.add_m_address")):
+        """Crea o edita una dirección de la empresa (entrega, bodega, sede). Solo usuarios de la empresa."""
+        if not has_perm(user, "locations.add_m_address"):
             raise BusinessPermissionError("No tienes permiso para guardar direcciones.")
-        company_id = self._resolve_company(user, data.get("company_id"))
+        company_id = data.get("company_id")
+        own = user_company_ids(user)
+        if company_id is None and len(own) == 1:
+            company_id = own[0]
+        if company_id not in own:
+            raise BusinessPermissionError("Las direcciones las guarda cada empresa.")
         company = M_company.objects.filter(pk=company_id, is_active=True).first()
         if company is None:
             raise BusinessNotFound("La empresa no existe.")

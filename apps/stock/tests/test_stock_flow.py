@@ -17,7 +17,7 @@ from enginedj.base.models import M_company, M_user_company
 from enginedj.notification.models import M_notification
 
 from apps.locations.models import M_address, M_loading_tag, M_location
-from apps.orders.models import M_item, M_order_line, M_type_item
+from apps.orders.models import M_item, M_order_line, M_type_item, M_unit
 from apps.stock.models import M_stock, M_stock_move
 from apps.testing import PASSWORD, build_world, proof_file, run_workflow
 
@@ -66,6 +66,7 @@ class StockFlowTests(APITestCase):
         cls.argos = M_company.objects.create(name="Argos", document_number="952")
 
         stock_type = M_type_item.objects.create(name="Materiales con stock", uses_stock=True)
+        M_unit.objects.create(company_id=cls.distritodo, symbol="bulto", name="Bulto")
         cls.cement = M_item.objects.create(company_id=cls.distritodo, type_item_id=stock_type, name="Cemento gris",
                                            unit="bulto", weight_kg=Decimal("50"), odoo_ref="501")
         cls.brick = M_item.objects.create(company_id=cls.distritodo, type_item_id=stock_type, name="Ladrillo",
@@ -175,6 +176,10 @@ class StockFlowTests(APITestCase):
         self.assertEqual((order["state"], order["address"]["id"], order["odoo_purchase"]),
                          ("confirmed", plant["id"], ""))
 
+        # Al armar el viaje, despacho ve el stock disponible en la línea pendiente
+        pending = self.ok(run_workflow(self.dispatch, "orders.pending_lines", {"company_id": self.distritodo.id}))
+        self.assertEqual(Decimal(next(p for p in pending if p["id"] == line_id)["stock_available"]), Decimal("200"))
+
         # 7. Viaje: carga 150 desde el stock; el origen es el lugar de cargue del pedido; 50 quedan pendientes
         trip = self.ok(run_workflow(self.dispatch, "trips.build", {
             "company_id": self.distritodo.id, "allocations": [{"order_line_id": line_id, "qty": "150"}],
@@ -252,6 +257,7 @@ class StockFlowTests(APITestCase):
         # El comercial no pide compras ni ve stock; el facturador solo ve su empresa
         self.assertFalse(self.request(10, user=self.dt_commercial).ok)
         self.assertFalse(run_workflow(self.dt_commercial, "stock.list").ok)
+        self.assertFalse(run_workflow(self.biller, "stock.list").ok)  # el stock solo lo ve Hurgo
         req = self.ok(self.request(10))
         self.assertEqual(len(self.ok(run_workflow(self.biller, "stock.purchase_request.list"))), 1)
         self.assertFalse(run_workflow(self.biller, "stock.requirements", {"company_id": self.uma.id}).ok)

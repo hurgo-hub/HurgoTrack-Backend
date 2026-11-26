@@ -22,5 +22,18 @@ class S_order_line(BaseService[E_order_line]):
         S_order().apply_logistic_state(order_ids, user)
 
     def pending_for_trips(self, user, company_id=None):
+        """Líneas por asignar; las de productos con stock traen ``stock_available`` (lo ve solo Hurgo)."""
+        from apps.stock.repository import R_stock
+
         require_perm(user, "trips.build_trip", "Solo el equipo de despacho arma viajes.")
-        return self.repository.pending_for_trips(company_id=company_id)
+        lines = self.repository.pending_for_trips(company_id=company_id)
+        r_stock, cache = R_stock(), {}
+        for line in lines:
+            if not line.item_id.type_item_id.uses_stock:
+                line.stock_available = None
+                continue
+            company = line.order_id.company_id_id
+            if company not in cache:
+                cache[company] = r_stock.available_by_item(company)
+            line.stock_available = cache[company].get(line.item_id_id, 0)
+        return lines

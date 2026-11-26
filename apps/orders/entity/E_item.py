@@ -15,7 +15,7 @@ class E_item(E_model_base):
         odoo_ref: Optional[str] = '',
         name: Optional[str] = None,
         description: Optional[str] = '',
-        unit: Optional[str] = 'und',
+        unit_id: Optional[int | dict] = None,
         weight_kg: Optional[Decimal] = None,
         is_vehicle: Optional[bool] = False,
         is_serialized: Optional[bool] = False,
@@ -30,7 +30,7 @@ class E_item(E_model_base):
         self.odoo_ref = odoo_ref
         self.name = name
         self.description = description
-        self.unit = unit
+        self.unit_id = unit_id or kwargs.get("unit_id_id")
         self.weight_kg = weight_kg
         self.is_vehicle = is_vehicle
         self.is_serialized = is_serialized

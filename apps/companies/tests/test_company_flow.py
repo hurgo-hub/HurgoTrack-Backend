@@ -113,14 +113,26 @@ class CompanyFlowTests(APITestCase):
         self.assertFalse(run_workflow(admin, "locations.address.save", {
             "company_id": self.uma.id, "location_id": self.city.id, "name": "X", "address": "Y"}).ok)
 
+        # Sus tipos y unidades los crea la empresa (Hurgo no)
+        materials = self.ok(run_workflow(admin, "catalogs.save", {"catalog": "type_item", "name": "Materiales"}))
+        self.ok(run_workflow(admin, "catalogs.save", {"catalog": "unit", "name": "Bulto", "symbol": "bulto"}))
+        self.assertIn("no existe o es de otra empresa", run_workflow(admin, "orders.item.save", {
+            "company_id": company["id"], "type_item_id": self.materials.id, "name": "X"}).reason)
         item = self.ok(run_workflow(admin, "orders.item.save", {
-            "company_id": company["id"], "type_item_id": self.materials.id, "name": "Cemento gris", "unit": "bulto",
+            "company_id": company["id"], "type_item_id": materials["id"], "name": "Cemento gris", "unit": "bulto",
             "weight_kg": "50", "sku": "CEM-1"}))
         self.assertEqual((item["name"], Decimal(item["weight_kg"])), ("Cemento gris", Decimal("50")))
         self.assertIn("Ya existe un producto", run_workflow(admin, "orders.item.save", {
-            "company_id": company["id"], "type_item_id": self.materials.id, "name": "Otro", "sku": "CEM-1"}).reason)
+            "company_id": company["id"], "type_item_id": materials["id"], "name": "Otro", "sku": "CEM-1"}).reason)
         self.assertFalse(run_workflow(admin, "orders.item.save", {
-            "company_id": self.uma.id, "type_item_id": self.materials.id, "name": "X"}).ok)
+            "company_id": self.uma.id, "type_item_id": materials["id"], "name": "X"}).ok)
+        # Hurgo no crea productos, direcciones ni usuarios de la empresa
+        self.assertFalse(run_workflow(self.admin, "orders.item.save", {
+            "company_id": company["id"], "type_item_id": materials["id"], "name": "De Hurgo"}).ok)
+        self.assertFalse(run_workflow(self.admin, "locations.address.save", {
+            "company_id": company["id"], "location_id": self.city.id, "name": "De Hurgo", "address": "X"}).ok)
+        self.assertFalse(run_workflow(self.admin, "companies.user.save", {
+            "company_id": company["id"], "username": "de_hurgo", "password": "Hurgo-2026!x", "role": "comercial"}).ok)
         self.assertFalse(run_workflow(admin, "orders.company_items", {"company_id": self.uma.id}).ok)
 
         # Hace lo del comercial: pide con su producto, y solo ve sus pedidos
@@ -129,9 +141,9 @@ class CompanyFlowTests(APITestCase):
         self.assertEqual(order["company"]["id"], company["id"])
         listing = {"data": {"fields": ["id", "code"], "limit": 50}}
         self.assertEqual([o["id"] for o in self.ok(run_workflow(admin, "orders.list", listing))], [order["id"]])
-        # Stock y solicitudes: solo los de su empresa
-        self.assertFalse(run_workflow(admin, "stock.requirements", {"company_id": self.uma.id}).ok)
-        self.assertTrue(run_workflow(admin, "stock.requirements", {"company_id": company["id"]}).ok)
+        # El stock solo lo ve Hurgo; la empresa solo ve sus solicitudes de compra
+        self.assertFalse(run_workflow(admin, "stock.requirements", {"company_id": company["id"]}).ok)
+        self.assertFalse(run_workflow(admin, "stock.list").ok)
         self.assertEqual(self.ok(run_workflow(admin, "stock.purchase_request.list")), [])
         lookups = self.ok(run_workflow(admin, "locations.lookups"))
         self.assertEqual([c["id"] for c in lookups["companies"]], [company["id"]])

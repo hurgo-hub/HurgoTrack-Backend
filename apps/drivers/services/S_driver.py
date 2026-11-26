@@ -32,6 +32,11 @@ class S_driver(BaseService[E_driver]):
             )
         if driver.license_expire and driver.license_expire < today:
             raise BusinessError(f"La licencia de {driver} venció el {driver.license_expire}.", code="license_expired")
+        from apps.fleet.services.S_vehicle import missing_fleet_documents
+
+        missing = missing_fleet_documents("driver", driver.pk, today)
+        if missing:
+            raise BusinessError(f"{driver} no tiene vigentes: {', '.join(missing)}.", code="documents_expired")
 
     def is_user(self, driver_id, user) -> bool:
         return self.repository.is_user(driver_id, user)

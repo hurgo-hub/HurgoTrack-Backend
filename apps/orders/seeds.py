@@ -37,4 +37,7 @@ WORKFLOWS = {
     "orders.set_loading_point": ["orders.set_loading_point_order"],
     "orders.company_items": ["orders.add_m_item"],
     "orders.item.save": ["orders.add_m_item"],
+    # Documentos del pedido (el servicio valida: usuarios de la empresa del pedido o despacho)
+    "orders.documents": ["orders.view_m_order"],
+    "orders.attach": ["orders.view_m_order"],
 }

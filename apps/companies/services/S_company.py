@@ -5,7 +5,7 @@
   escribe Hurgo. ``is_freelance`` (conductor sin empresa que acepta solicitudes de cargue) aún no
   se desarrolla: estas empresas siempre son ``is_client``.
 - ``users`` / ``save_user``: el admin de la empresa crea y edita los usuarios de SU empresa, solo
-  con los roles de ``COMPANY_ROLES``. Nunca roles de Hurgo (despacho, administración, conductor).
+  con los roles de alcance empresa (``M_role.scope``). Nunca roles de Hurgo (despacho, administración, conductor).
 """
 
 from django.contrib.auth import get_user_model
@@ -21,8 +21,19 @@ from enginedj.base.services.permissions import has_perm, require_perm, user_comp
 User = get_user_model()
 
 COMPANY_ADMIN_ROLE = "admin_empresa"
-COMPANY_ROLES = [COMPANY_ADMIN_ROLE, "comercial", "facturador"]
-ROLE_LABELS = {"admin_empresa": "Administrador de la empresa", "comercial": "Comercial", "facturador": "Facturador"}
+
+
+def _company_roles() -> list[str]:
+    """Roles que se pueden dar a usuarios de una empresa: los de alcance "empresa" (incluye los nuevos)."""
+    from apps.companies.services.S_role import company_role_names
+
+    return company_role_names()
+
+
+def _label(name):
+    from apps.companies.services.S_role import role_label
+
+    return role_label(name)
 COMPANY_FIELDS = ("name", "document_number", "verification_digit", "email", "phone")
 
 
@@ -33,9 +44,7 @@ class S_company:
     # ------------------------------------------------------------------
     @staticmethod
     def require_manage(user, company_id):
-        """Administración de Hurgo gestiona cualquier empresa; el admin de empresa, solo las suyas."""
-        if has_perm(user, "companies.create_company"):
-            return
+        """Solo el administrador de la empresa gestiona lo suyo (Hurgo la crea con su primer admin)."""
         if has_perm(user, "companies.manage_company") and company_id in user_company_ids(user):
             return
         raise BusinessPermissionError("Solo puedes gestionar tu propia empresa.")
@@ -101,14 +110,14 @@ class S_company:
         """Empresas que el usuario gestiona y los tipos de producto (para el formulario de productos)."""
         from apps.orders.models import M_type_item
 
-        if not (has_perm(user, "companies.manage_company") or has_perm(user, "companies.create_company")):
+        if not has_perm(user, "companies.manage_company"):
             raise BusinessPermissionError("No administras ninguna empresa.")
         companies = M_company.objects.filter(pk__in=user_company_ids(user), is_active=True).order_by("name")
-        types = M_type_item.objects.filter(is_active=True).order_by("name")
+        types = M_type_item.objects.filter(company_id__in=[c.pk for c in companies], is_active=True).order_by("name")
         return {
             "companies": [{"id": c.id, "name": c.name, "is_client": c.is_client} for c in companies],
             "type_items": [{"id": t.id, "name": t.name, "uses_stock": t.uses_stock} for t in types],
-            "roles": [{"value": r, "label": ROLE_LABELS[r]} for r in COMPANY_ROLES],
+            "roles": [{"value": r, "label": _label(r)} for r in _company_roles()],
         }
 
     def users(self, user, company_id):
@@ -124,17 +133,19 @@ class S_company:
 
     @staticmethod
     def _user_row(u):
-        roles = [g.name for g in u.groups.all() if g.name in COMPANY_ROLES]
+        company_roles = _company_roles()
+        roles = [g.name for g in u.groups.all() if g.name in company_roles]
         return {"id": u.id, "username": u.username, "first_name": u.first_name, "last_name": u.last_name,
                 "email": u.email, "is_active": u.is_active, "role": roles[0] if roles else None,
-                "role_label": ROLE_LABELS.get(roles[0]) if roles else None}
+                "role_label": _label(roles[0]) if roles else None}
 
     @transaction.atomic
     def save_user(self, user, company_id, data: dict):
         """Crea (sin user_id) o edita un usuario de la empresa."""
         self.require_manage(user, company_id)
         company = self._company(company_id)
-        if data.get("role") not in COMPANY_ROLES:
+        company_roles = _company_roles()
+        if data.get("role") not in company_roles:
             raise BusinessError("Rol no permitido para usuarios de una empresa.", code="invalid_role")
         if not data.get("user_id"):
             return self._user_row(self._create_user(company, data, user))
@@ -142,7 +153,7 @@ class S_company:
         target = User.objects.select_for_update().filter(pk=data["user_id"]).first()
         if target is None or not M_user_company.objects.filter(user_id=target, company_id=company).exists():
             raise BusinessNotFound("El usuario no pertenece a esta empresa.")
-        if target.is_staff or target.is_superuser or target.groups.exclude(name__in=COMPANY_ROLES).exists():
+        if target.is_staff or target.is_superuser or target.groups.exclude(name__in=company_roles).exists():
             raise BusinessPermissionError("Ese usuario lo administra Hurgo.")
         if target.pk == user.pk and (data["role"] != COMPANY_ADMIN_ROLE or data.get("is_active") is False):
             raise BusinessError("No puedes quitarte el rol de administrador ni desactivarte.", code="self_demote")
@@ -190,5 +201,5 @@ class S_company:
         group = Group.objects.filter(name=role).first()
         if group is None:
             raise BusinessError(f"El rol '{role}' no existe; corre seed_workflows.", code="missing_role")
-        target.groups.remove(*Group.objects.filter(name__in=COMPANY_ROLES))
+        target.groups.remove(*Group.objects.filter(name__in=_company_roles()))
         target.groups.add(group)

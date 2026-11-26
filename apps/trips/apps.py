@@ -13,3 +13,4 @@ class TripsConfig(AppConfig):
         import apps.trips.steps.stp_trip_line  # noqa: F401
         import apps.trips.steps.stp_trip_line_serie  # noqa: F401
         import apps.trips.steps.stp_trip_event  # noqa: F401
+        import apps.trips.steps.stp_document  # noqa: F401

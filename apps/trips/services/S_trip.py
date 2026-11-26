@@ -264,6 +264,9 @@ class S_trip(BaseService[E_trip]):
                     f"Parada {allocation.trip_line_id.sequence}: faltan {allocation.qty - registered:.0f} VIN de "
                     f"{allocation.order_line_id.item_id} por registrar.", code="missing_series",
                 )
+        from apps.trips.services.S_document import require_loading_documents
+
+        require_loading_documents(trip)
         trip.departure_date = timezone.now()
         self.r_line.start_route(trip)
         self.set_state(trip, user, "in_route", "Salida a ruta", latitude=latitude, longitude=longitude)
