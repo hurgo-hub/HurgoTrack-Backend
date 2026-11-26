@@ -91,6 +91,7 @@ class Sz_order_detail(serializers.ModelSerializer):
 
 class Sz_item_lookup(serializers.ModelSerializer):
     type_item = serializers.CharField(source="type_item_id.name", read_only=True)
+    unit = serializers.CharField(read_only=True)
     brand = serializers.CharField(source="brand_id.name", default=None, read_only=True)
 
     class Meta:
@@ -110,12 +111,14 @@ class Sz_pending_order_line(serializers.ModelSerializer):
     loading_address_id = serializers.IntegerField(source="order_id.address_id_id", read_only=True, allow_null=True)
     loading_address = serializers.CharField(source="order_id.address_id.name", default=None, read_only=True)
     uses_stock = serializers.BooleanField(source="item_id.type_item_id.uses_stock", read_only=True)
+    stock_available = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True, allow_null=True,
+                                               default=None)
 
     class Meta:
         model = M_order_line
         fields = ["id", "order_id", "order_code", "company_id", "recipient", "address", "item_id", "item", "brand",
                   "qty", "qty_assigned", "qty_delivered", "qty_pending", "state", "loading_address_id",
-                  "loading_address", "uses_stock"]
+                  "loading_address", "uses_stock", "stock_available"]
 
 
 # ----------------------------------------------------------------------
@@ -166,13 +169,17 @@ class Sz_lookup_in(serializers.Serializer):
 
 class Sz_item(serializers.ModelSerializer):
     type_item = serializers.CharField(source="type_item_id.name", read_only=True)
+    unit = serializers.CharField(read_only=True)
+    unit_name = serializers.CharField(source="unit_id.name", default=None, read_only=True)
+    brand = serializers.CharField(source="brand_id.name", default=None, read_only=True)
     uses_stock = serializers.BooleanField(source="type_item_id.uses_stock", read_only=True)
     loading_tags = serializers.SerializerMethodField()
 
     class Meta:
         model = M_item
         fields = ["id", "company_id", "type_item_id", "type_item", "uses_stock", "sku", "odoo_ref", "name",
-                  "description", "unit", "weight_kg", "is_serialized", "is_active", "loading_tags"]
+                  "description", "unit_id", "unit", "unit_name", "brand_id", "brand", "weight_kg", "is_serialized",
+                  "is_active", "loading_tags"]
 
     def get_loading_tags(self, obj):
         return [{"id": t.id, "name": t.name} for t in obj.loading_tags.all()]
@@ -183,7 +190,9 @@ class Sz_item_in(serializers.Serializer):
     company_id = serializers.IntegerField()
     type_item_id = serializers.IntegerField()
     name = serializers.CharField(max_length=200)
-    unit = serializers.ChoiceField(choices=[c[0] for c in M_item.unit_choices], required=False, default="und")
+    unit_id = serializers.IntegerField(required=False, allow_null=True, help_text="Unidad de la empresa o común.")
+    unit = serializers.CharField(max_length=20, required=False, help_text="Código de la unidad (alternativa a unit_id).")
+    brand_id = serializers.IntegerField(required=False, allow_null=True)
     weight_kg = serializers.DecimalField(max_digits=10, decimal_places=3, required=False, allow_null=True)
     sku = serializers.CharField(max_length=60, required=False, allow_blank=True)
     odoo_ref = serializers.CharField(max_length=60, required=False, allow_blank=True)

@@ -6,7 +6,8 @@ facturador. Nunca recibe permisos ``view_all_*`` ni de despacho: todo lo ve limi
 """
 
 ROLES = {
-    "administracion": ["companies.*"],
+    # Hurgo crea la empresa con su primer admin y gestiona roles; no administra los usuarios de la empresa
+    "administracion": ["companies.create_company", "companies.manage_roles"],
     "admin_empresa": ["companies.manage_company"],
 }
 
@@ -17,4 +18,10 @@ WORKFLOWS = {
     "companies.mine": ["companies.manage_company"],
     "companies.users": ["companies.manage_company"],
     "companies.user.save": ["companies.manage_company"],
+    # Roles con permisos y usuarios (administración de Hurgo)
+    "roles.list": ["companies.manage_roles"],
+    "roles.permissions": ["companies.manage_roles"],
+    "roles.save": ["companies.manage_roles"],
+    "users.list": ["companies.manage_roles"],
+    "users.save": ["companies.manage_roles"],
 }

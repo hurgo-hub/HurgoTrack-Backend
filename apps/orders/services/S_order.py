@@ -198,6 +198,9 @@ class S_order(BaseService[E_order]):
         self._require_state(order, ("requested",), "confirmar")
         if loading_address_id is not None:
             self._apply_loading_point(order, user, loading_address_id)
+        from apps.trips.services.S_document import require_order_documents
+
+        require_order_documents(order)
         odoo_purchase = (odoo_purchase or "").strip()
         if not odoo_purchase:
             if not self.r_line.all_use_stock(order):

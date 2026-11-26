@@ -16,4 +16,5 @@ class M_company_admin(M_company):
         permissions = [
             ("create_company", "Puede crear empresas y su usuario administrador"),
             ("manage_company", "Puede gestionar su propia empresa (usuarios, direcciones, productos)"),
+            ("manage_roles", "Puede crear roles, asignarles permisos y asignar roles a usuarios"),
         ]

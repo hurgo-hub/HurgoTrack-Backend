@@ -8,3 +8,4 @@ from .vehicle_gps import *
 from .soat import *
 from .mechanical_inspection import *
 from .vehicle_attach import *
+from .fleet_document import *

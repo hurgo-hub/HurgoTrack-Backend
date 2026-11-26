@@ -14,7 +14,7 @@ from enginedj.base.models import M_company, M_user_company
 from apps.drivers.models import M_driver
 from apps.fleet.models import M_brand_vehicle, M_mechanical_inspection, M_partner, M_soat, M_type_vehicle, M_vehicle
 from apps.locations.models import M_address, M_country, M_location
-from apps.orders.models import M_brand, M_item, M_order, M_order_line, M_type_item
+from apps.orders.models import M_brand, M_item, M_order, M_order_line, M_type_item, M_unit
 
 PASSWORD = "Clave-123"
 
@@ -108,6 +108,7 @@ def build_world(t):
                                    weight_kg=Decimal("120"), is_vehicle=True, is_serialized=True)
     t.moto_other = M_item.objects.create(company_id=t.uma, type_item_id=motos, brand_id=brand_other,
                                          name="Otra 150", is_vehicle=True, is_serialized=True)
+    M_unit.objects.create(company_id=t.uma, symbol="bulto", name="Bulto")  # las unidades son de cada empresa
     t.cement = M_item.objects.create(company_id=t.uma, type_item_id=materials, name="Cemento", unit="bulto",
                                      weight_kg=Decimal("50"))
     t.akt_item = M_item.objects.create(company_id=t.akt, type_item_id=materials, name="Arena AKT")

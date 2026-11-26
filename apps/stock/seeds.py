@@ -2,6 +2,7 @@
 
 Rol nuevo ``facturador``: usuario de la empresa cliente (ej. Distritodo) que recibe las
 solicitudes de compra de Hurgo, compra en Odoo y registra la compra. Ve solo su empresa.
+El stock (disponible y kardex) solo lo ve Hurgo.
 """
 
 ROLES = {
@@ -10,13 +11,12 @@ ROLES = {
         "stock.view_m_*", "stock.view_all_stock", "stock.view_all_purchase_request",
         "stock.manage_purchase_request", "stock.link_purchase_request",
     ],
+    # El stock solo lo ve Hurgo (al armar viajes); la empresa solo ve y registra sus compras.
     "admin_empresa": [
-        "stock.view_m_stock", "stock.view_m_stock_move", "stock.view_m_purchase_request",
-        "stock.view_m_purchase_request_line", "stock.link_purchase_request",
+        "stock.view_m_purchase_request", "stock.view_m_purchase_request_line", "stock.link_purchase_request",
     ],
     "facturador": [
-        "stock.view_m_stock", "stock.view_m_stock_move", "stock.view_m_purchase_request",
-        "stock.view_m_purchase_request_line", "stock.link_purchase_request",
+        "stock.view_m_purchase_request", "stock.view_m_purchase_request_line", "stock.link_purchase_request",
     ],
 }
 

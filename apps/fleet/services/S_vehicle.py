@@ -35,6 +35,10 @@ class S_vehicle(BaseService[E_vehicle]):
         if (rtm is None and not is_new) or (rtm is not None and rtm < today):
             raise BusinessError(f"El vehículo {vehicle.plate} no tiene revisión técnico-mecánica vigente.",
                                 code="rtm_expired")
+        missing = missing_fleet_documents("vehicle", vehicle.pk, today)
+        if missing:
+            raise BusinessError(f"El vehículo {vehicle.plate} no tiene vigentes: {', '.join(missing)}.",
+                                code="documents_expired")
 
     def check_capacity(self, vehicle, weight, motorcycles):
         if vehicle.load_capacity_kg and weight > vehicle.load_capacity_kg:
@@ -66,3 +70,18 @@ class S_vehicle(BaseService[E_vehicle]):
                     if hasattr(value, "isoformat"):
                         row[field] = value.isoformat()
         return result
+
+
+def missing_fleet_documents(applies_to, owner_id, today):
+    """Documentos obligatorios de flota que faltan o están vencidos (vehículo o conductor)."""
+    from apps.fleet.models import M_driver_document, M_fleet_document_type, M_vehicle_document
+
+    model, field = (M_vehicle_document, "vehicle_id") if applies_to == "vehicle" else (M_driver_document, "driver_id")
+    missing = []
+    for doc_type in M_fleet_document_type.objects.filter(applies_to=applies_to, is_required=True, is_active=True):
+        docs = model.objects.filter(**{field: owner_id}, type_id=doc_type, is_active=True)
+        if doc_type.has_expiration:
+            docs = docs.filter(date_expire__gte=today)
+        if not docs.exists():
+            missing.append(doc_type.name)
+    return missing

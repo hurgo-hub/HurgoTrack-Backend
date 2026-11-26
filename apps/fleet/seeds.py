@@ -7,4 +7,6 @@ ROLES = {
 
 WORKFLOWS = {
     "fleet.document_expirations": ["fleet.view_m_vehicle"],
+    "fleet.documents": ["fleet.view_m_vehicle"],
+    "fleet.document.upload": ["fleet.add_m_vehicle_document"],
 }
