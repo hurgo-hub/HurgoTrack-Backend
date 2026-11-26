@@ -17,9 +17,9 @@ class DriverAppTests(APITestCase):
         build_world(cls)
         cls.trip = M_trip.objects.create(company_id=cls.uma, carrier_id=cls.hurgo, vehicle_id=cls.vehicle,
                                          driver_id=cls.driver, origin_address_id=cls.warehouse, state="assigned")
-        M_trip_line.objects.create(trip_id=cls.trip, sequence=1, recipient_id=cls.dealer, address_id=cls.dealer_addr,
+        M_trip_line.objects.create(trip_id=cls.trip, sequence=1, recipient_id=cls.uma, address_id=cls.dealer_addr,
                                    qty=Decimal("3"), state="delivered")
-        M_trip_line.objects.create(trip_id=cls.trip, sequence=2, recipient_id=cls.dealer2,
+        M_trip_line.objects.create(trip_id=cls.trip, sequence=2, recipient_id=cls.uma,
                                    address_id=cls.dealer2_addr, qty=Decimal("2"))
 
     def login(self):
@@ -68,7 +68,7 @@ class DriverAppTests(APITestCase):
         (trip,) = r.data["details"]["context"]["results"]
         self.assertEqual(trip["code"], self.trip.code)
         self.assertEqual((trip["stops_total"], trip["stops_done"], trip["total_qty"]), (2, 1, "5.00"))
-        self.assertEqual(trip["destination"]["recipient"], "Concesionario 2")
+        self.assertEqual(trip["destination"]["name"], "Concesionario 2")
         self.assertEqual(trip["origin_location"], "Valledupar")
 
     def test_logout_deletes_cookies(self):

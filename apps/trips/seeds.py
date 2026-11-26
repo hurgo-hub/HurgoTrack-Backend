@@ -17,6 +17,8 @@ ROLES = {
         "trips.create_return_trip", "trips.report_novelty_trip", "trips.view_all_trip",
     ],
     "comercial": ["trips.view_m_trip", "trips.view_m_trip_line", "trips.view_m_trip_event", "trips.view_m_trip_attach"],
+    "admin_empresa": ["trips.view_m_trip", "trips.view_m_trip_line", "trips.view_m_trip_event",
+                      "trips.view_m_trip_attach"],
     # view_m_* y no view_*: view_all_trip le dejaría ver todos los viajes.
     "conductor": ["trips.view_m_*", "trips.drive_trip", "trips.report_novelty_trip"],
 }

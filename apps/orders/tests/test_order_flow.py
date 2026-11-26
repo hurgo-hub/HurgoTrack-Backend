@@ -23,9 +23,8 @@ class OrderFlowTests(APITestCase):
     def setUpTestData(cls):
         build_world(cls)
 
-    def line(self, item, qty, recipient=None, address=None):
-        return {"item_id": item.id, "qty": str(qty), "recipient_id": (recipient or self.dealer).id,
-                "address_id": (address or self.dealer_addr).id}
+    def line(self, item, qty, address=None):
+        return {"item_id": item.id, "qty": str(qty), "address_id": (address or self.dealer_addr).id}
 
     def payload(self, **overrides):
         data = {"address_id": self.warehouse.id, "notes": "Entregar en la mañana",
@@ -54,16 +53,16 @@ class OrderFlowTests(APITestCase):
         self.assertEqual(order["created_by"]["id"], self.commercial.id)
         self.assertEqual([e["name"] for e in order["events"]], ["Pedido creado", "Pedido enviado a Hurgo"])
 
-    def test_lines_can_go_to_different_recipients(self):
-        """Como order_dtd_line del .mwb: cada línea tiene su destinatario y dirección."""
-        order = self.ok(self.create(lines=[self.line(self.moto, 1),
-                                           self.line(self.moto, 2, self.dealer2, self.dealer2_addr)]))
+    def test_lines_can_go_to_different_addresses(self):
+        """Cada línea va a una dirección de entrega de la empresa que pide (una parada por dirección)."""
+        order = self.ok(self.create(lines=[self.line(self.moto, 1), self.line(self.moto, 2, self.dealer2_addr)]))
         self.ok(self.confirm(order["id"]))
         trip = self.ok(run_workflow(self.dispatch, "trips.build", {
             "company_id": self.uma.id, "origin_address_id": self.warehouse.id,
             "allocations": [{"order_line_id": line["id"], "qty": line["qty"]} for line in order["lines"]],
         }))
-        self.assertEqual(sorted(stop["recipient"]["id"] for stop in trip["lines"]), [self.dealer.id, self.dealer2.id])
+        self.assertEqual(sorted(stop["address"]["id"] for stop in trip["lines"]),
+                         sorted([self.dealer_addr.id, self.dealer2_addr.id]))
 
     def test_who_can_create(self):
         self.assertIn("No puedes crear pedidos para esa empresa", self.create(company_id=self.akt.id).reason)
@@ -71,15 +70,15 @@ class OrderFlowTests(APITestCase):
         self.assertIn("Indica la empresa", self.create(user=self.dispatch).reason)
         self.ok(self.create(user=self.dispatch, company_id=self.uma.id))
         self.assertIn("no está registrada como empresa cliente",
-                      self.create(user=self.dispatch, company_id=self.dealer.id).reason)
+                      self.create(user=self.dispatch, company_id=self.hurgo.id).reason)
 
     def test_line_and_address_validations(self):
         cases = {
             "es de otra empresa": self.payload(lines=[self.line(self.akt_item, 1)]),
             "repetido": self.payload(lines=[self.line(self.moto, 1), self.line(self.moto, 2)]),
             "unidades enteras": self.payload(lines=[self.line(self.moto, "1.5")]),
-            "no pertenece a Concesionario 1": self.payload(lines=[self.line(self.moto, 1, address=self.dealer2_addr)]),
-            "dirección de cargue no pertenece": self.payload(address_id=self.dealer_addr.id),
+            "no es de UMA": self.payload(lines=[self.line(self.moto, 1, address=self.akt_addr)]),
+            "dirección de cargue no pertenece": self.payload(address_id=self.akt_addr.id),
             "lines": self.payload(lines=[]),
         }
         for expected, data in cases.items():
@@ -94,9 +93,9 @@ class OrderFlowTests(APITestCase):
         self.assertIn("está 'Borrador'", self.confirm(order["id"]).reason)
 
         order = self.ok(run_workflow(self.commercial, "orders.update", {
-            "order_id": order["id"], **self.payload(lines=[self.line(self.moto, 5, self.dealer2, self.dealer2_addr)]),
+            "order_id": order["id"], **self.payload(lines=[self.line(self.moto, 5, self.dealer2_addr)]),
         }))
-        self.assertEqual((order["lines"][0]["recipient"]["id"], order["lines"][0]["qty"]), (self.dealer2.id, "5.00"))
+        self.assertEqual((order["lines"][0]["address"]["id"], order["lines"][0]["qty"]), (self.dealer2_addr.id, "5.00"))
         self.assertEqual(self.ok(run_workflow(self.commercial, "orders.submit", {"order_id": order["id"]}))["state"],
                          "requested")
         order = self.ok(self.confirm(order["id"], odoo="  PO-778 "))
@@ -140,9 +139,11 @@ class OrderFlowTests(APITestCase):
     def test_lookups(self):
         items = self.ok(run_workflow(self.commercial, "orders.items"))
         self.assertEqual({i["name"] for i in items}, {"UMA 125", "Otra 150", "Cemento"})
-        recipients = self.ok(run_workflow(self.commercial, "locations.recipients", {"q": "concesionario 2"}))
-        self.assertEqual([a["id"] for a in recipients[0]["addresses"]], [self.dealer2_addr.id])
-        self.assertIn("Permisos faltantes", run_workflow(self.driver_user, "locations.recipients").reason)
+        # Las direcciones de entrega son las de su propia empresa
+        addresses = self.ok(run_workflow(self.commercial, "locations.addresses"))
+        self.assertEqual({a["id"] for a in addresses}, {self.warehouse.id, self.dealer_addr.id, self.dealer2_addr.id})
+        self.assertFalse(run_workflow(self.commercial, "locations.addresses", {"company_id": self.akt.id}).ok)
+        self.assertIn("Permisos faltantes", run_workflow(self.driver_user, "locations.addresses").reason)
 
     def test_end_to_end_tracking(self):
         """Pedido -> confirmación -> viaje -> entrega: el cliente ve todo en el historial del pedido."""

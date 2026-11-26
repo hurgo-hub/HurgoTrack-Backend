@@ -57,7 +57,9 @@ def run_workflow(user, name, data=None, files=None) -> WorkflowResult:
 def build_world(t):
     """Crea el escenario y lo deja como atributos de ``t`` (la clase de test en setUpTestData).
 
-    - Hurgo (transportador), UMA (cliente con comercial), AKT (otro cliente), 2 concesionarios.
+    - Hurgo (transportador), UMA (cliente con comercial), AKT (otro cliente).
+    - Las direcciones de entrega son de la empresa que pide: UMA guarda "Concesionario 1" y
+      "Concesionario 2" (``dealer_addr`` / ``dealer2_addr``); AKT tiene ``akt_addr``.
     - Motos UMA (serializadas, 120 kg), motos de otra marca y cemento (50 kg).
     - order1: UMA -> concesionario 1 (2 motos + 10 cementos); order2: -> concesionario 2 (1 moto);
       order3: -> concesionario 1 (1 moto de otra marca). Los tres confirmados, cargue en la bodega UMA.
@@ -84,8 +86,6 @@ def build_world(t):
     t.hurgo = M_company.objects.create(name="Hurgo", document_number="900", is_carrier=True)
     t.uma = M_company.objects.create(name="UMA", document_number="901", is_client=True)
     t.akt = M_company.objects.create(name="AKT", document_number="902", is_client=True)
-    t.dealer = M_company.objects.create(name="Concesionario 1", document_number="903", is_recipient=True)
-    t.dealer2 = M_company.objects.create(name="Concesionario 2", document_number="904", is_recipient=True)
     M_user_company.objects.create(user_id=t.commercial, company_id=t.uma)
     M_user_company.objects.create(user_id=t.other_commercial, company_id=t.akt)
 
@@ -95,8 +95,10 @@ def build_world(t):
         country_id=country, parent_id=dep, location_type="municipality", code_dane="20001", name="Valledupar"
     )
     t.warehouse = M_address.objects.create(company_id=t.uma, name="Bodega UMA", address="Cl 1", location_id=city)
-    t.dealer_addr = M_address.objects.create(company_id=t.dealer, name="Sede 1", address="Cl 2", location_id=city)
-    t.dealer2_addr = M_address.objects.create(company_id=t.dealer2, name="Sede 2", address="Cl 3", location_id=city)
+    t.dealer_addr = M_address.objects.create(company_id=t.uma, name="Concesionario 1", address="Cl 2", location_id=city)
+    t.dealer2_addr = M_address.objects.create(company_id=t.uma, name="Concesionario 2", address="Cl 3",
+                                              location_id=city)
+    t.akt_addr = M_address.objects.create(company_id=t.akt, name="Bodega AKT", address="Cl 4", location_id=city)
 
     motos = M_type_item.objects.create(name="Motos", is_serialized=True)
     materials = M_type_item.objects.create(name="Materiales")
@@ -110,14 +112,14 @@ def build_world(t):
                                      weight_kg=Decimal("50"))
     t.akt_item = M_item.objects.create(company_id=t.akt, type_item_id=materials, name="Arena AKT")
 
-    def order(recipient, address, *lines):
+    def order(address, *lines):
         o = M_order.objects.create(company_id=t.uma, address_id=t.warehouse, order_date=today, state="confirmed")
-        return o, [M_order_line.objects.create(order_id=o, item_id=item, recipient_id=recipient, address_id=address,
+        return o, [M_order_line.objects.create(order_id=o, item_id=item, recipient_id=t.uma, address_id=address,
                                                qty=Decimal(qty)) for item, qty in lines]
 
-    t.order1, (t.l_moto, t.l_cement) = order(t.dealer, t.dealer_addr, (t.moto, 2), (t.cement, 10))
-    t.order2, (t.l_moto2,) = order(t.dealer2, t.dealer2_addr, (t.moto, 1))
-    t.order3, (t.l_other,) = order(t.dealer, t.dealer_addr, (t.moto_other, 1))
+    t.order1, (t.l_moto, t.l_cement) = order(t.dealer_addr, (t.moto, 2), (t.cement, 10))
+    t.order2, (t.l_moto2,) = order(t.dealer2_addr, (t.moto, 1))
+    t.order3, (t.l_other,) = order(t.dealer_addr, (t.moto_other, 1))
 
     owner = M_partner.objects.create(company_id=t.hurgo, name="Propietario", document_number="123")
     t.vehicle = M_vehicle.objects.create(

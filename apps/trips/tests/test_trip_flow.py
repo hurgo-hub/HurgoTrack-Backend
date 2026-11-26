@@ -42,8 +42,8 @@ class TripFlowTests(APITestCase):
         self.assertTrue(result.ok, result.reason)
         return result.data
 
-    def stop(self, trip, recipient):
-        return next(line for line in trip["lines"] if line["recipient"]["id"] == recipient.id)
+    def stop(self, trip, address):
+        return next(line for line in trip["lines"] if line["address"]["id"] == address.id)
 
     def register_vins(self, trip):
         n = 0
@@ -76,7 +76,7 @@ class TripFlowTests(APITestCase):
     def test_full_flow_closes_trip_and_delivers_orders(self):
         trip = self.ok(self.build_trip())
         self.assertEqual((trip["state"], trip["brand"], len(trip["lines"])), ("draft", "UMA", 2))
-        self.assertEqual(Decimal(self.stop(trip, self.dealer)["weight_kg"]), Decimal("740"))  # 2*120 + 10*50
+        self.assertEqual(Decimal(self.stop(trip, self.dealer_addr)["weight_kg"]), Decimal("740"))  # 2*120 + 10*50
         self.l_moto.refresh_from_db()
         self.order1.refresh_from_db()
         self.assertEqual((self.l_moto.state, self.order1.state), ("assigned", "in_progress"))
@@ -90,7 +90,7 @@ class TripFlowTests(APITestCase):
         trip = self.ok(run_workflow(self.driver_user, "trips.depart",
                                     {"trip_id": trip["id"], "latitude": 10.4631234567, "longitude": -73.25}))
         self.assertEqual(trip["state"], "in_route")
-        stop1, stop2 = self.stop(trip, self.dealer), self.stop(trip, self.dealer2)
+        stop1, stop2 = self.stop(trip, self.dealer_addr), self.stop(trip, self.dealer2_addr)
         trip = self.ok(run_workflow(self.driver_user, "trips.start_delivery",
                                     {"trip_id": trip["id"], "trip_line_id": stop1["id"]}))
         self.assertEqual(trip["state"], "delivering")
@@ -180,13 +180,13 @@ class TripFlowTests(APITestCase):
     def test_return_releases_qty_and_creates_return_trip(self):
         trip = self.ready_to_go()
         self.ok(run_workflow(self.driver_user, "trips.depart", {"trip_id": trip["id"]}))
-        stop1, stop2 = self.stop(trip, self.dealer), self.stop(trip, self.dealer2)
+        stop1, stop2 = self.stop(trip, self.dealer_addr), self.stop(trip, self.dealer2_addr)
         self.ok(self.deliver(trip, stop1))
         trip = self.ok(run_workflow(self.driver_user, "trips.register_return",
                                     {"trip_id": trip["id"], "trip_line_id": stop2["id"], "reason": "No recibe"},
                                     files=[proof_file("dev.jpg")]))
         self.assertEqual(trip["state"], "closed")
-        returned = self.stop(trip, self.dealer2)
+        returned = self.stop(trip, self.dealer2_addr)
         self.assertEqual((returned["state"], returned["is_return"]), ("returned", True))
         self.l_moto2.refresh_from_db()
         self.order2.refresh_from_db()

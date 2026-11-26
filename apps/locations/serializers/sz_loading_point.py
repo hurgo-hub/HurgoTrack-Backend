@@ -64,3 +64,28 @@ class Sz_tag_in(serializers.Serializer):
 
 class Sz_tags_in(serializers.Serializer):
     q = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class Sz_company_address(serializers.ModelSerializer):
+    location = serializers.CharField(source="location_id.name", read_only=True)
+
+    class Meta:
+        model = M_address
+        fields = ["id", "company_id", "name", "address", "description", "location_id", "location", "contact_name",
+                  "contact_phone", "is_loading_point", "is_active"]
+
+
+class Sz_company_address_in(serializers.Serializer):
+    address_id = serializers.IntegerField(required=False, allow_null=True, help_text="Vacío = crear.")
+    company_id = serializers.IntegerField(required=False, allow_null=True, help_text="Vacío = la del usuario.")
+    location_id = serializers.IntegerField()
+    name = serializers.CharField(max_length=120)
+    address = serializers.CharField(max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True)
+    contact_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    contact_phone = serializers.CharField(required=False, allow_blank=True, max_length=40)
+    is_active = serializers.BooleanField(required=False)
+
+
+class Sz_company_id_in(serializers.Serializer):
+    company_id = serializers.IntegerField(required=False, allow_null=True)
