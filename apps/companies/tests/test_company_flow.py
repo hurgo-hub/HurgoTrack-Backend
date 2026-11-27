@@ -154,7 +154,7 @@ class CompanyFlowTests(APITestCase):
 
 
 class IdentifyTests(APITestCase):
-    """Paso 1 del login: respuesta neutra (no revela si el usuario existe ni si está activo)."""
+    """Paso 1 del login: valida el usuario en la base (404 si no existe, 403 si está desactivado)."""
 
     @classmethod
     def setUpTestData(cls):
@@ -164,18 +164,19 @@ class IdentifyTests(APITestCase):
         cls.inactive.save()
         M_user_company.objects.create(user_id=cls.inactive, company_id=cls.uma)
 
-    def identify(self, username):
+    def identify(self, username, status=200):
         response = client_for(None).post("/api/auth/identify/", {"username": username}, format="json")
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, status, username)
         return response.data
 
     def test_known_user_of_one_company_gets_its_brand(self):
-        self.assertEqual(self.identify("COMERCIAL")["company"]["name"], "UMA")
+        self.assertEqual(self.identify("COMERCIAL"), {"username": "comercial",
+                                                      "company": {"name": "UMA", "color": None, "slogan": None}})
 
-    def test_unknown_inactive_or_without_company_look_the_same(self):
-        expected = {"company": None}
-        for username in ("no-existe", "inactivo", "despacho"):
-            self.assertEqual(self.identify(username), expected, username)
+    def test_user_is_checked_against_the_database(self):
+        self.assertEqual(self.identify("despacho"), {"username": "despacho", "company": None})  # Hurgo: sin marca
+        self.assertEqual(self.identify("no-existe", 404)["code"], "user_not_found")
+        self.assertEqual(self.identify("inactivo", 403)["code"], "user_inactive")
 
 
 class HurgoCompanySeedTests(APITestCase):
