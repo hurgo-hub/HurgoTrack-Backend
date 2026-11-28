@@ -64,8 +64,10 @@ class TripFlowTests(APITestCase):
         })
 
     def ready_to_go(self):
+        """Asignado y aceptado por el conductor en la app: listo para salir."""
         trip = self.register_vins(self.ok(self.build_trip()))
-        return self.ok(self.assign(trip))
+        trip = self.ok(self.assign(trip))
+        return self.ok(run_workflow(self.driver_user, "trips.accept", {"trip_id": trip["id"]}))
 
     def deliver(self, trip, stop, user=None, files=None, **data):
         return run_workflow(user or self.driver_user, "trips.deliver",
@@ -86,7 +88,12 @@ class TripFlowTests(APITestCase):
         trip = self.ok(self.assign(trip))
         self.assertEqual(trip["state"], "assigned")
         mine = self.ok(run_workflow(self.driver_user, "trips.mine"))
-        self.assertEqual([t["code"] for t in mine], [trip["code"]])
+        self.assertEqual([(t["code"], t["driver_response"]) for t in mine], [(trip["code"], "")])
+        # Sale solo después de aceptar el viaje en la app
+        self.assertIn("Primero acepta el viaje", run_workflow(self.driver_user, "trips.depart",
+                                                              {"trip_id": trip["id"]}).reason)
+        self.assertEqual(self.ok(run_workflow(self.driver_user, "trips.accept",
+                                              {"trip_id": trip["id"]}))["driver_response"], "accepted")
 
         trip = self.ok(run_workflow(self.driver_user, "trips.depart",
                                     {"trip_id": trip["id"], "latitude": 10.4631234567, "longitude": -73.25}))
@@ -159,6 +166,7 @@ class TripFlowTests(APITestCase):
     def test_depart_requires_all_vins(self):
         trip = self.ok(self.build_trip())
         self.ok(self.assign(trip))
+        self.ok(run_workflow(self.driver_user, "trips.accept", {"trip_id": trip["id"]}))
         r = run_workflow(self.driver_user, "trips.depart", {"trip_id": trip["id"]})
         self.assertIn("VIN", r.reason)
 
@@ -250,8 +258,9 @@ class TripFlowTests(APITestCase):
         self.assertEqual(len(lines), 4)
         self.assertIn("Permisos faltantes", run_workflow(self.commercial, "orders.pending_lines").reason)
 
-    def test_login_with_cookies_only(self):
-        """Web y app móvil: el login del motor deja la cookie access_token; no se acepta Bearer."""
+    def test_web_login_uses_cookies(self):
+        """Web: el login del motor deja la cookie access_token (no viaja en el cuerpo). La app del conductor
+        entra por /api/mobile/auth/token/ y manda Bearer (ver apps/drivers/tests/test_mobile_app.py)."""
         trip = self.ready_to_go()
         client = APIClient()
         r = client.post("/api/auth/token/", {"username": "conductor", "password": PASSWORD}, format="json")
@@ -261,8 +270,6 @@ class TripFlowTests(APITestCase):
         r = client.post("/api/workflows/sync/trips.mine/", {}, format="json")
         self.assertTrue(r.data["success"], r.data)
         self.assertEqual(r.data["details"]["context"]["results"][0]["code"], trip["code"])
-
-        bearer = APIClient()
-        bearer.credentials(HTTP_AUTHORIZATION=f"Bearer {client.cookies['access_token'].value}")
-        r = bearer.post("/api/workflows/sync/trips.mine/", {}, format="json")
-        self.assertFalse(r.data["success"], r.data)
+        # Sin cookie ni Bearer no hay sesión
+        r = APIClient().post("/api/workflows/sync/trips.mine/", {}, format="json")
+        self.assertFalse(r.status_code == 200 and r.data.get("success"), r.data)

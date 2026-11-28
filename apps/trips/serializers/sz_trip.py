@@ -101,12 +101,14 @@ class Sz_trip_list(serializers.ModelSerializer):
     driver = serializers.SerializerMethodField()
     origin_address = serializers.CharField(source="origin_address_id.name", default=None, read_only=True)
     parent_trip = serializers.CharField(source="parent_trip_id.code", default=None, read_only=True)
+    driver_response_display = serializers.CharField(source="get_driver_response_display", read_only=True)
 
     class Meta:
         model = M_trip
         fields = ["id", "code", "trip_type", "trip_type_display", "state", "state_display", "company", "brand",
                   "vehicle", "driver", "origin_address", "parent_trip", "planned_departure", "departure_date",
-                  "closed_date", "create_date"]
+                  "closed_date", "create_date", "driver_response", "driver_response_display",
+                  "driver_response_date", "driver_response_note"]
 
     def get_company(self, obj):
         return {"id": obj.company_id_id, "name": obj.company_id.name}
@@ -208,6 +210,10 @@ class Sz_assign_in(Sz_trip_id_in):
 
 class Sz_cancel_in(Sz_trip_id_in):
     reason = serializers.CharField()
+
+
+class Sz_reject_in(Sz_trip_id_in):
+    reason = serializers.CharField(allow_blank=True)  # el servicio pide el motivo con su propio mensaje
 
 
 class Sz_depart_in(Sz_trip_id_in, Sz_position_in):

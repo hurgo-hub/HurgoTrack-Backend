@@ -137,16 +137,28 @@ HURGO_COMPANY_DV = env("HURGO_COMPANY_DV", default="")
 
 ROOT_URLCONF = "config.urls"
 
-# REST_FRAMEWORK viene de enginedj.settings: autenticación solo por la cookie "access_token"
-# (CookieJWTAuthentication). Web y app móvil inician sesión con POST /api/auth/token/.
-# Límite para el paso 1 del login (POST /api/auth/identify/), por cliente.
+# REST_FRAMEWORK viene de enginedj.settings. Autenticación: la web por la cookie "access_token"
+# (CookieJWTAuthentication, login en /api/auth/token/); la app del conductor con el encabezado
+# "Authorization: Bearer" (login en /api/mobile/auth/token/). Límites de intentos por cliente.
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,  # noqa: F405
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        *REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"],  # noqa: F405
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
     "DEFAULT_THROTTLE_RATES": {
         **REST_FRAMEWORK.get("DEFAULT_THROTTLE_RATES", {}),  # noqa: F405
         "auth_identify": env("AUTH_IDENTIFY_RATE", default="20/min"),
+        "mobile_login": env("MOBILE_LOGIN_RATE", default="10/min"),
     },
 }
+
+# App del conductor: sesión de 30 días y notificaciones push por Expo (Expo entrega por Firebase;
+# las credenciales de Firebase se suben a EAS, no van aquí). PUSH_ENABLED=False no envía nada.
+MOBILE_REFRESH_DAYS = env.int("MOBILE_REFRESH_DAYS", default=30)
+PUSH_ENABLED = env.bool("PUSH_ENABLED", default=False)
+EXPO_PUSH_URL = env("EXPO_PUSH_URL", default="https://exp.host/--/api/v2/push/send")
+EXPO_ACCESS_TOKEN = env("EXPO_ACCESS_TOKEN", default="")
 
 # WSGI_APPLICATION y ASGI_APPLICATION vienen de enginedj.settings:
 #   enginedj.wsgi.application

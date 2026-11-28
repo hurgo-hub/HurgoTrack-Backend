@@ -50,6 +50,13 @@ class M_trip(M_model_base, models.Model):
     returned_line_id = models.ForeignKey("trips.M_trip_line", on_delete=models.PROTECT, null=True, blank=True,
                                          related_name="trip_returned_line_id", db_column="returned_line_id",
                                          help_text="Parada devuelta que originó este viaje de regreso.")
+    # Respuesta del conductor en la app: vacío = esperando; al rechazar, el viaje vuelve a despacho
+    driver_response_choices = [("", "Esperando respuesta"), ("accepted", "Aceptado"), ("rejected", "Rechazado")]
+    driver_response = models.CharField(max_length=10, null=False, blank=True, default="",
+                                       choices=driver_response_choices)
+    driver_response_date = models.DateTimeField(null=True, blank=True)
+    driver_response_note = models.TextField(null=False, blank=True, default="",
+                                            help_text="Motivo del rechazo (y quién lo rechazó).")
     planned_departure = models.DateTimeField(null=True, blank=True)
     departure_date = models.DateTimeField(null=True, blank=True)
     closed_date = models.DateTimeField(null=True, blank=True)

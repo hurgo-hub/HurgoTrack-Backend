@@ -232,6 +232,7 @@ class StockFlowTests(APITestCase):
         self.assertEqual(self.stock(), Decimal("20"))
         self.ok(run_workflow(self.dispatch, "trips.assign",
                              {"trip_id": trip["id"], "vehicle_id": self.vehicle.id, "driver_id": self.driver.id}))
+        run_workflow(self.driver_user, "trips.accept", {"trip_id": trip["id"]})
         trip = self.ok(run_workflow(self.driver_user, "trips.depart", {"trip_id": trip["id"]}))
         self.ok(run_workflow(self.driver_user, "trips.register_return",
                              {"trip_id": trip["id"], "trip_line_id": trip["lines"][0]["id"], "reason": "Cerrado"},

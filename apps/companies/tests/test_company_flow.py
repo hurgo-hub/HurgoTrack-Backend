@@ -170,11 +170,12 @@ class IdentifyTests(APITestCase):
         return response.data
 
     def test_known_user_of_one_company_gets_its_brand(self):
-        self.assertEqual(self.identify("COMERCIAL"), {"username": "comercial",
+        self.assertEqual(self.identify("COMERCIAL"), {"username": "comercial", "driver_only": False,
                                                       "company": {"name": "UMA", "color": None, "slogan": None}})
 
     def test_user_is_checked_against_the_database(self):
-        self.assertEqual(self.identify("despacho"), {"username": "despacho", "company": None})  # Hurgo: sin marca
+        self.assertEqual(self.identify("despacho"), {"username": "despacho", "company": None, "driver_only": False})
+        self.assertTrue(self.identify("conductor")["driver_only"])  # entra por la app, no por la web
         self.assertEqual(self.identify("no-existe", 404)["code"], "user_not_found")
         self.assertEqual(self.identify("inactivo", 403)["code"], "user_inactive")
 

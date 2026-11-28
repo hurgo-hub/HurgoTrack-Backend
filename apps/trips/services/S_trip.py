@@ -229,8 +229,52 @@ class S_trip(BaseService[E_trip]):
             carrier = R_company().get_active(carrier_id)
             if carrier is None:
                 raise BusinessNotFound("El transportador no existe.")
+        previous_driver = trip.driver_id if trip.driver_id_id and trip.driver_id_id != driver.pk else None
         trip.vehicle_id, trip.driver_id, trip.carrier_id = vehicle, driver, carrier
+        # Nueva asignación: el conductor tiene que aceptarla en la app
+        trip.driver_response, trip.driver_response_date, trip.driver_response_note = "", None, ""
         self.set_state(trip, user, "assigned", "Vehículo y conductor asignados", description=f"{vehicle.plate} / {driver}")
+        from apps.drivers.services.S_push import notify_driver
+
+        notify_driver(driver, "Nuevo viaje asignado", self._trip_summary(trip), trip, kind="trip_assigned")
+        if previous_driver is not None:
+            notify_driver(previous_driver, "Viaje reasignado", f"El viaje {trip.code} se asignó a otro conductor.",
+                          trip, kind="trip_unassigned")
+        return trip
+
+    def _trip_summary(self, trip):
+        stops = M_trip_line.objects.filter(trip_id=trip, is_active=True).count()
+        origin = f" · carga en {trip.origin_address_id.name}" if trip.origin_address_id_id else ""
+        return f"{trip.code} · {stops} parada{'s' if stops != 1 else ''}{origin}"
+
+    # ------------------------------------------------------------------
+    # 3b. Respuesta del conductor (app)
+    # ------------------------------------------------------------------
+    @transaction.atomic
+    def accept(self, user, trip_id):
+        trip = self.lock(trip_id)
+        self.require_driver(trip, user)
+        self.require_state(trip, ("assigned",), "aceptar")
+        if trip.driver_response != "accepted":
+            trip.driver_response, trip.driver_response_date, trip.driver_response_note = "accepted", timezone.now(), ""
+            self.repository.save_trip(trip, user)
+            self.events.register(trip, user, "Conductor aceptó el viaje")
+        return trip
+
+    @transaction.atomic
+    def reject(self, user, trip_id, reason):
+        """El conductor no puede hacer el viaje: queda sin vehículo ni conductor y vuelve a despacho."""
+        trip = self.lock(trip_id)
+        self.require_driver(trip, user)
+        self.require_state(trip, ("assigned",), "rechazar")
+        reason = (reason or "").strip()
+        if not reason:
+            raise BusinessError("Indica por qué no puedes hacer el viaje.", code="reason_required")
+        driver_name = str(trip.driver_id)
+        trip.vehicle_id = trip.driver_id = trip.carrier_id = None
+        trip.driver_response, trip.driver_response_date = "rejected", timezone.now()
+        trip.driver_response_note = f"{driver_name}: {reason}"
+        self.set_state(trip, user, "draft", "Conductor rechazó el viaje", description=trip.driver_response_note)
         return trip
 
     @transaction.atomic
@@ -241,7 +285,13 @@ class S_trip(BaseService[E_trip]):
         self.require_state(trip, EDITABLE_STATES, "cancelar (ya salió a ruta)")
         if not (reason or "").strip():
             raise BusinessError("Indica el motivo de la cancelación.")
+        driver = trip.driver_id if trip.driver_id_id else None
         self.set_state(trip, user, "cancelled", "Viaje cancelado", description=reason)
+        if driver is not None:
+            from apps.drivers.services.S_push import notify_driver
+
+            notify_driver(driver, "Viaje cancelado", f"El viaje {trip.code} se canceló: {reason}", trip,
+                          kind="trip_cancelled")
         s_stock = S_stock()
         for allocation in self.r_allocation.of_trip(trip).select_related(
                 "order_line_id__item_id__type_item_id", "order_line_id__order_id"):
@@ -257,6 +307,8 @@ class S_trip(BaseService[E_trip]):
         trip = self.lock(trip_id)
         self.require_driver(trip, user)
         self.require_state(trip, ("assigned",), "salir a ruta")
+        if trip.driver_response != "accepted":
+            raise BusinessError("Primero acepta el viaje en la app.", code="not_accepted")
         r_serie = R_trip_line_serie()
         for allocation in self.r_allocation.serialized_of_trip(trip):
             registered = r_serie.registered_count(allocation)
