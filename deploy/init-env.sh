@@ -42,6 +42,11 @@ REDIS_URL=redis://redis:6379
 CACHE_PREFIX=hurgotrack
 FIELD_ENCRYPTION_KEY=$FERNET_KEY
 
+# App del conductor: notificaciones push por Expo (las credenciales de Firebase van en Expo, no aquí)
+PUSH_ENABLED=False
+EXPO_ACCESS_TOKEN=
+MOBILE_REFRESH_DAYS=30
+
 # Empresa Hurgo (transportador, dueña de la flota). seed_workflows la crea al arrancar.
 HURGO_COMPANY_NAME=
 HURGO_COMPANY_NIT=

@@ -370,6 +370,21 @@ solicitud (referencia `SIM-<código>`, en la copia local marcada `raw.simulated`
 registra con el flujo normal: lo comprado entra al stock igual que con una compra real.
 Los productos necesitan su Ref. Odoo (un número). Nunca lo enciendas junto a un Odoo real.
 
+## App del conductor (`~/Project/hurgotrack/apk`, Expo)
+
+Los conductores no entran a la web: usan la app **Hurgo Conductor** (APK de Android).
+
+- Login: `POST /api/mobile/auth/token/` {username, password} → `access` + `refresh` en el cuerpo (solo
+  conductores activos). Renovar: `POST /api/mobile/auth/refresh/` (rota el refresh; dura
+  `MOBILE_REFRESH_DAYS`, 30 por defecto). La app usa los mismos workflows con `Authorization: Bearer`.
+- Celular: `mobile.device.register` / `unregister` guardan el token push de Expo (`drivers.M_device`).
+- Notificaciones (`apps/drivers/services/S_push.py`, tarea `drivers.tasks.send_push`): al asignar, reasignar
+  o cancelar un viaje. Van por la API de Expo Push, que entrega por Firebase con las credenciales
+  subidas a Expo (`eas credentials`). En el `.env`: `PUSH_ENABLED=True` y, opcional, `EXPO_ACCESS_TOKEN`.
+- El conductor **acepta** (`trips.accept`) o **rechaza con motivo** (`trips.reject`) el viaje. Si rechaza,
+  el viaje vuelve a "Armando" sin vehículo ni conductor y despacho ve "Rechazado por …". No se sale a ruta
+  sin aceptar.
+
 ## Integración con Satrack (`apps.apiSatrack`)
 
 Posiciones GPS de los vehículos para el mapa del frontend (componentes de

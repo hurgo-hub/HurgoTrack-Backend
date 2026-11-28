@@ -10,3 +10,4 @@ class DriversConfig(AppConfig):
     def ready(self):
         # Importar los steps para registrarlos en el motor
         import apps.drivers.steps.stp_driver  # noqa: F401
+        import apps.drivers.steps.stp_device  # noqa: F401

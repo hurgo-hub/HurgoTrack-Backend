@@ -64,8 +64,9 @@ class DocumentTests(APITestCase):
         trip = self.ok(run_workflow(self.dispatch, "trips.build", {
             "company_id": self.uma.id, "origin_address_id": self.warehouse.id,
             "allocations": [{"order_line_id": self.l_cement.id, "qty": "10"}]}))
-        return self.ok(run_workflow(self.dispatch, "trips.assign", {
+        self.ok(run_workflow(self.dispatch, "trips.assign", {
             "trip_id": trip["id"], "vehicle_id": self.vehicle.id, "driver_id": self.driver.id}))
+        return self.ok(run_workflow(self.driver_user, "trips.accept", {"trip_id": trip["id"]}))
 
     def test_loading_and_delivery_documents(self):
         rows = self.ok(run_workflow(self.admin, "catalogs.list", {"catalog": "process_document_type"}))

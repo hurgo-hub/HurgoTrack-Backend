@@ -32,6 +32,8 @@ WORKFLOWS = {
     "trips.cancel": ["trips.cancel_trip"],
     "trips.create_return_trip": ["trips.create_return_trip"],
     "trips.mine": ["trips.drive_trip"],
+    "trips.accept": ["trips.drive_trip"],
+    "trips.reject": ["trips.drive_trip"],
     "trips.depart": ["trips.drive_trip"],
     "trips.start_delivery": ["trips.drive_trip"],
     "trips.deliver": ["trips.drive_trip"],  # el servicio exige además ser el conductor asignado

@@ -108,6 +108,7 @@ class ApiOdooTests(APITestCase):
             }).data
             run_workflow(self.dispatch, "trips.assign",
                          {"trip_id": trip["id"], "vehicle_id": self.vehicle.id, "driver_id": self.driver.id})
+            run_workflow(self.driver_user, "trips.accept", {"trip_id": trip["id"]})
             run_workflow(self.driver_user, "trips.depart", {"trip_id": trip["id"]})
             result = run_workflow(self.driver_user, "trips.deliver",
                                   {"trip_id": trip["id"], "trip_line_id": trip["lines"][0]["id"]}, files=[proof_file()])

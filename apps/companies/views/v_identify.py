@@ -46,4 +46,7 @@ class IdentifyUserView(APIView):
         if len(links) == 1:
             c = links[0].company_id
             company = {"name": c.name, "color": c.color or None, "slogan": c.slogan or None}
-        return Response({"username": user.username, "company": company})
+        # Solo conductor (sin permisos de despacho): entra por la app, no por la web
+        driver_only = (not user.is_superuser and user.has_perm("trips.drive_trip")
+                       and not user.has_perm("trips.view_all_trip"))
+        return Response({"username": user.username, "company": company, "driver_only": driver_only})

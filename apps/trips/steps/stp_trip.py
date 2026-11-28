@@ -10,6 +10,7 @@ from apps.trips.serializers import (
     Sz_assign_in,
     Sz_cancel_in,
     Sz_depart_in,
+    Sz_reject_in,
     Sz_return_trip_in,
     Sz_trip_build_in,
     Sz_trip_detail,
@@ -62,6 +63,26 @@ def cancel_trip(context, params, execution):
     data = validate_input(Sz_cancel_in, context)
     S_trip().cancel(user, data["trip_id"], data["reason"])
     return trip_detail(user, data["trip_id"])
+
+
+@register_module("trips.accept", important=True)
+@in_company_schema(company_from=trip_company)
+def accept_trip(context, params, execution):
+    """El conductor acepta el viaje que le asignaron (app)."""
+    user = context_user(context)
+    data = validate_input(Sz_trip_id_in, context)
+    S_trip().accept(user, data["trip_id"])
+    return trip_detail(user, data["trip_id"])
+
+
+@register_module("trips.reject", important=True)
+@in_company_schema(company_from=trip_company)
+def reject_trip(context, params, execution):
+    """El conductor rechaza el viaje con el motivo; vuelve a despacho para asignar otro conductor."""
+    user = context_user(context)
+    data = validate_input(Sz_reject_in, context)
+    trip = S_trip().reject(user, data["trip_id"], data["reason"])
+    return results({"id": trip.pk, "code": trip.code, "state": trip.state})  # ya no es su viaje
 
 
 @register_module("trips.depart", important=True)

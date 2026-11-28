@@ -161,6 +161,7 @@ class OrderFlowTests(APITestCase):
         }))
         self.ok(run_workflow(self.dispatch, "trips.assign",
                              {"trip_id": trip["id"], "vehicle_id": self.vehicle.id, "driver_id": self.driver.id}))
+        run_workflow(self.driver_user, "trips.accept", {"trip_id": trip["id"]})
         self.ok(run_workflow(self.driver_user, "trips.depart", {"trip_id": trip["id"]}))
 
         tracking = self.ok(run_workflow(self.commercial, "orders.retrieve", {"order_id": order["id"]}))
